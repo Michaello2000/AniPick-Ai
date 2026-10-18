@@ -12,6 +12,7 @@ Anime viewers with an AniList or MyAnimeList backlog who want to decide what to 
 
 - Preserve both username import paths, source statuses and ratings, search, filters, durable local data, and API recovery.
 - AI requests use a configurable open-weight model through a server-only adapter. Never expose keys or manufacture recommendations. Selected history and candidates reach the cloud only after explicit consent.
+- Optional local OpenAI-compatible inference sends the same bounded data only to a validated loopback endpoint. It requires no Google consent and never falls back to cloud. Bonsai 2 is prioritized, while real server-reported model IDs remain selectable. Weights and inference runtimes live outside this repository.
 - The library remains useful without AI. Inference may be unavailable or fail validation; a configured key is not evidence of a successful recommendation.
 - Verified metadata stays separate from generated interpretations. Unknown dub availability remains unknown.
 - The visual system remains the established personal-library design. Media integration extends the detail dialog without replacing navigation or the recommendation workflow.

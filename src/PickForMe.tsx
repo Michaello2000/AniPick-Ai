@@ -5,6 +5,7 @@ import { api, errorMessage } from './api.js';
 import { Cover } from './AnimeCard.js';
 import { Icon } from './icons.js';
 import { lengths } from './length-options.js';
+import { AiSettings } from './AiSettings.js';
 
 interface PickProps { library: Library; onOpen: (anime: Anime) => void }
 
@@ -24,10 +25,20 @@ export function PickForMe({ library, onOpen }: PickProps) {
   const [connection, setConnection] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [contextAttempt, setContextAttempt] = useState(0);
+  const [selectedMode, setSelectedMode] = useState<'cloud' | 'local' | null>(null);
+  const [model, setModel] = useState('');
+  const [local, setLocal] = useState<{ models: string[]; baseUrl: string; timeoutMs: number; defaultModel: string } | null>(null);
+  const [localLoading, setLocalLoading] = useState(true);
+  const [localError, setLocalError] = useState<string | null>(null);
+  const [modelAttempt, setModelAttempt] = useState(0);
   const [result, setResult] = useState<{ preferencesKey: string; response: RecommendationResponse } | null>(null);
   const requestController = useRef<AbortController | null>(null);
   const entries = useMemo(() => new Map(library.entries.map(anime => [anime.id, anime])), [library.entries]);
-  const preferencesKey = JSON.stringify(preferences);
+  const mode = selectedMode ?? context?.ai.mode ?? 'cloud';
+  const cloud = context?.cloud ?? context?.ai;
+  const ready = mode === 'cloud' ? Boolean(cloud?.configured) : Boolean(local?.models.includes(model) && !localLoading && !localError);
+  const timeoutMs = mode === 'local' ? local?.timeoutMs ?? 600000 : 120000;
+  const preferencesKey = JSON.stringify({ preferences, mode, model: mode === 'local' ? model : cloud?.model, endpoint: mode === 'local' ? local?.baseUrl : undefined });
   const current = result?.preferencesKey === preferencesKey ? result.response : null;
   const preview = useMemo(() => library.entries.filter(anime => anime.status === 'planning' && anime.poster).slice(0, 3), [library.entries]);
 
@@ -39,16 +50,33 @@ export function PickForMe({ library, onOpen }: PickProps) {
     return () => controller.abort();
   }, [library.id, contextAttempt]);
   useEffect(() => () => requestController.current?.abort(), []);
+  useEffect(() => {
+    if (mode !== 'local') return;
+    const controller = new AbortController();
+    api.localModels(controller.signal).then(data => {
+      if (controller.signal.aborted) return;
+      setLocal(data);
+      setModel(current => data.models.includes(current) ? current : data.models.includes(data.defaultModel) ? data.defaultModel : data.models.find(id => /bonsai[-_ .]?2[-_ .].*(?:9b|27b)/i.test(id)) ?? '');
+    }).catch(failure => { if (!controller.signal.aborted) { setLocal(null); setLocalError(errorMessage(failure)); } })
+      .finally(() => { if (!controller.signal.aborted) setLocalLoading(false); });
+    return () => controller.abort();
+  }, [mode, modelAttempt]);
+
+  function changeMode(next: 'cloud' | 'local') {
+    if (next === mode) return;
+    setSelectedMode(next); setConsent(false); setConnection(null); setError(null);
+    if (next === 'local') { setLocalLoading(true); setLocalError(null); }
+  }
 
   function updatePreference(update: Partial<RecommendationPreferences>) { setPreferences(current => ({ ...current, ...update })); }
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!consent || busy) return;
+    if ((mode === 'cloud' && !consent) || !ready || busy) return;
     const controller = new AbortController();
     requestController.current = controller;
     setBusy(true); setError(null);
     try {
-      const response = await api.recommend({ libraryId: library.id, preferences, allowCloudProcessing: true }, controller.signal);
+      const response = await api.recommend({ libraryId: library.id, preferences, allowCloudProcessing: mode === 'cloud' && consent, ai: { mode, ...(mode === 'local' ? { model } : {}) } }, controller.signal, timeoutMs);
       if (!controller.signal.aborted) setResult({ preferencesKey, response });
     } catch (failure) {
       if (!controller.signal.aborted) setError(failure instanceof Error && failure.name === 'TimeoutError' ? 'AI analysis took too long. Try again in a moment or narrow your preferences. Your saved list is unchanged.' : errorMessage(failure));
@@ -56,7 +84,7 @@ export function PickForMe({ library, onOpen }: PickProps) {
   }
   async function checkConnection() {
     setChecking(true); setConnection(null); setError(null);
-    try { const status = await api.checkAi(); setConnection(status.message); }
+    try { const status = await api.checkAi({ mode, ...(mode === 'local' ? { model } : {}) }); setConnection(status.message); }
     catch (failure) { setError(errorMessage(failure)); }
     finally { setChecking(false); }
   }
@@ -64,7 +92,7 @@ export function PickForMe({ library, onOpen }: PickProps) {
   return <section id="pick-for-me" className="pick-section" aria-labelledby="pick-heading">
     <div className="pick-heading"><div><h1 id="pick-heading">Find your next<br /><span>favorite.</span></h1><p>A story for your mood, chosen from your own Plan to Watch.</p></div>{preview.length > 0 && <div className="pick-preview"><div>{preview.map(anime => <button key={anime.id} type="button" onClick={() => onOpen(anime)} aria-label={`Details for ${anime.title}`}><Cover anime={anime} /></button>)}</div><p>Your Plan to Watch</p></div>}</div>
     {!context ? <p className="pick-note" role="status">{error ? 'AI settings could not be loaded. Your Library tab is still available.' : 'Checking AI settings…'}</p> : <>
-      {!context.ai.configured && <div className="configuration-note" role="status"><Icon name="sliders" size={18} /><p>{context.ai.message}</p></div>}
+      {mode === 'cloud' && !cloud?.configured && <div className="configuration-note" role="status"><Icon name="sliders" size={18} /><p>{cloud?.message}</p></div>}
       {context.totalPlanning === 0 && <p className="pick-note">Add titles to Plan to Watch on your list provider and refresh your library to get suggestions.</p>}
       <form onSubmit={event => { void submit(event); }}>
         <fieldset className="pick-fields" disabled={busy || checking}>
@@ -78,13 +106,13 @@ export function PickForMe({ library, onOpen }: PickProps) {
             <label><span className="field-label">Number of suggestions</span><select value={preferences.maxResults} onChange={event => updatePreference({ maxResults: Number(event.target.value) })}><option value={5}>Up to 5</option><option value={3}>Up to 3</option><option value={1}>Just one</option></select></label>
             <div className="dub-preference"><label className="checkbox-label"><input type="checkbox" disabled={context.verifiedDubs === 0} checked={preferences.englishDub === 'verified'} onChange={event => updatePreference({ englishDub: event.target.checked ? 'verified' : 'any' })} />Verified English dub only</label><p>{context.verifiedDubs > 0 ? `${context.verifiedDubs} Plan to Watch titles have an attributable dub record.` : 'English dub availability: Unknown. No verified dub source is connected, so this filter is unavailable.'}</p></div>
           </div></details>
-          <div className="pick-submit-row"><label className="checkbox-label cloud-consent"><input type="checkbox" checked={consent} onChange={event => setConsent(event.target.checked)} /><span>I agree to send selected watch history, personal ratings, and anime metadata to {context.ai.provider} for analysis.<small>Your username and private notes stay on this computer.</small></span></label>
-          <button className="primary-button pick-button" type="submit" disabled={!context.ai.configured || !consent || context.totalPlanning === 0}>{busy ? <><span className="spinner" />Finding your pick…</> : <><Icon name="shuffle" size={18} />Pick for Me <Icon name="arrow" size={18} /></>}</button></div>
+          <div className="pick-submit-row">{mode === 'cloud' ? <label className="checkbox-label cloud-consent"><input type="checkbox" checked={consent} onChange={event => setConsent(event.target.checked)} /><span>I agree to send selected watch history, personal ratings, and anime metadata to {cloud?.provider} for analysis.<small>Your username and private notes stay on this computer.</small></span></label> : <p className="pick-note">Local mode · selected data goes to your configured loopback server. Google consent is not required.</p>}
+          <button className="primary-button pick-button" type="submit" disabled={!ready || (mode === 'cloud' && !consent) || context.totalPlanning === 0}>{busy ? <><span className="spinner" />Finding your pick…</> : <><Icon name="shuffle" size={18} />Pick for Me <Icon name="arrow" size={18} /></>}</button></div>
         </fieldset>
       </form>
-      <details className="ai-settings"><summary><Icon name="sliders" size={15} />AI settings & privacy<Icon name="chevron" size={14} /></summary><div className="ai-settings-content"><div className="ai-configuration"><p>{context.ai.configured ? <>{context.ai.provider} · <span>{context.ai.model}</span></> : context.ai.message}</p>{context.ai.configured && <button type="button" className="text-button" disabled={busy || checking} onClick={() => { void checkConnection(); }}>{checking ? 'Checking…' : 'Test AI connection'}</button>}</div><p className="pick-note">At most 16 history entries and 24 eligible titles are selected, with shortened descriptions. Requesting fewer suggestions uses a smaller candidate sample. Your username, posters, notes, and community ratings are not sent. This is cloud inference.</p></div></details>
+      <AiSettings mode={mode} onMode={changeMode} model={model} onModel={next => { setModel(next); setConnection(null); }} models={local?.models ?? []} baseUrl={local?.baseUrl} loading={localLoading} localError={localError} onRefresh={() => { setConnection(null); setLocalError(null); setLocalLoading(true); setModelAttempt(value => value + 1); }} cloud={cloud ?? context.ai} busy={busy} checking={checking} ready={ready} onCheck={() => { void checkConnection(); }} />
     </>}
-    {busy && <p className="pick-note" role="status" aria-live="polite">Analyzing your history, then ranking eligible titles. This can take up to two minutes. You can switch to Library while this runs.</p>}
+    {busy && <p className="pick-note" role="status" aria-live="polite">Analyzing your history, then ranking eligible titles. This can take up to {Math.ceil(timeoutMs / 60000)} minutes. You can switch to Library while this runs.</p>}
     {connection && <p className="pick-note" role="status">{connection}</p>}
     {error && <div className="pick-error" role="alert"><p>{error}</p>{!context && <button className="text-button" onClick={() => setContextAttempt(value => value + 1)}>Retry AI settings</button>}</div>}
     {result && !current && <p className="pick-note" role="status">Preferences changed. Choose Pick for Me to get suggestions for these preferences.</p>}

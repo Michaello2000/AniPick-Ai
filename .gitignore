@@ -7,3 +7,9 @@ data/
 *.tsbuildinfo
 coverage/
 *.log
+# Keep downloaded model weights and inference runtimes outside the project.
+*.gguf
+*.safetensors
+models/
+runtime/
+Bonsai-demo/

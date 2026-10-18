@@ -50,7 +50,7 @@ async function stop(): Promise<void> {
   }
 }
 async function post(base: string, route: string, data: unknown): Promise<Response> {
-  return fetch(`${base}${route}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data), signal: AbortSignal.timeout(130000) });
+  return fetch(`${base}${route}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data), signal: AbortSignal.timeout((configuration.status.timeoutMs ?? 120000) + 10000) });
 }
 const failureSchema = z.object({ error: z.object({ code: z.string() }) });
 async function successful(response: Response): Promise<unknown> {

@@ -10,15 +10,17 @@ The visual system is documented in [DESIGN.md](DESIGN.md), with product constrai
 
 ## Screenshots
 
-**Actual application screenshots are still pending.** Browser access in this audit environment reports “Local browser use is disabled in Work settings.” No reference-site image or mockup is presented as AniPick.
+Actual Cloud/Local settings, captured from the production app in Brave. No inference server was running, so these show loading/recovery rather than fabricated model results.
 
-Before submission, capture the running app with a real imported library: desktop Library, Pick for Me with a successful real result, anime details/trailer, and a phone-width view. Save the images under `docs/screenshots/` and embed them here. Crop account names if desired and keep keys/configuration files out of captures. Rendered desktop/mobile, keyboard/focus, and playback review also remain outstanding.
+![AniPick local AI settings on desktop](docs/screenshots/local-settings-desktop.jpg)
+
+[Phone-width settings screenshot](docs/screenshots/local-settings-mobile.jpg). Settings were reviewed at 1440px and 390px, including keyboard mode selection, consent reset, unavailable-server recovery, and horizontal overflow. Full successful-result and video-playback review remains outstanding.
 
 ## Run locally
 
 Requires **Node.js 24+** (uses built-in `node:sqlite`) and **pnpm 11+**. No database installation, public domain, cloud hosting, or AI key is needed.
 
-The AI key is needed only for new recommendations. If PowerShell says `pnpm` is not recognized, install Node.js 24+ from the [official download page](https://nodejs.org/en/download), reopen PowerShell, and run `npm.cmd install --global pnpm@11.25.0`. Use `pnpm.cmd` in place of `pnpm` if PowerShell script execution is restricted. Tools available inside a coding agent's environment may not be on your terminal's PATH.
+The Google key is needed only for new cloud recommendations; local inference needs a running compatible server instead. If PowerShell says `pnpm` is not recognized, install Node.js 24+ from the [official download page](https://nodejs.org/en/download), reopen PowerShell, and run `npm.cmd install --global pnpm@11.25.0`. Use `pnpm.cmd` in place of `pnpm` if PowerShell script execution is restricted. Tools available inside a coding agent's environment may not be on your terminal's PATH.
 
 ```powershell
 pnpm install
@@ -79,6 +81,69 @@ MAL retrieves all statuses with 500-entry offset pagination and follows only val
 
 Pick for Me adds explicit, consented AI taste analysis and mood-based ranking. Anime details include source-listed YouTube trailers, search fallbacks, TikTok discovery, and saved community video links, as described below. External account writes and an automated dub-data integration are not implemented. Imported dub availability remains **Unknown** unless an attributable server-side record exists; the UI disables the verified-dub filter when there are no such records.
 
+## Optional local AI: Bonsai 2
+
+Open **Pick for Me → AI settings** and choose **Cloud** or **Local**. Cloud keeps Google/Gemma and its consent checkbox. Local discovers model IDs from `/v1/models`; Bonsai 2 9B and 27B are prioritized, and other compatible models remain selectable. Local requires no Google consent/key and never falls back to cloud. Startup defaults come from `.env`; selections remain while the app stays open.
+
+### Windows setup
+
+Use [PrismML's official Bonsai-demo](https://github.com/PrismML-Eng/Bonsai-demo), **outside this repository**. Review its setup script and hardware requirements before running; downloads can be large. AniPick does not download weights or start the runtime.
+
+In a separate PowerShell window:
+
+```powershell
+Set-Location $env:USERPROFILE
+git clone https://github.com/PrismML-Eng/Bonsai-demo.git
+Set-Location Bonsai-demo
+$env:BONSAI_FAMILY='bonsai2'
+$env:BONSAI_MODEL='9B'  # Or '27B'; run setup for the chosen size
+$env:BONSAI_HOST='127.0.0.1'
+.\setup.ps1
+.\scripts\start_llama_server.ps1
+```
+
+If Windows blocks scripts, follow PrismML's documented process-scoped execution-policy instructions after reviewing them. Keep loopback binding; do not use `0.0.0.0` or enable public/LAN sharing. Leave this server running and start AniPick in another terminal.
+
+Optimized `PQ2_0`/`PTQ1_0` GGUF packs need PrismML's fork; official `Q2_0` needs a recent upstream runtime with Bonsai 2 integration. Use the demo's matching runtime rather than assuming any GGUF engine works. See [model formats](https://github.com/PrismML-Eng/Bonsai-demo/blob/main/MODEL-FORMATS.md). Ollama/LM Studio bundle their own engines; API compatibility does not establish optimized Bonsai weight support.
+
+Add to AniPick's existing `.env`, keeping Google configuration:
+
+```dotenv
+LOCAL_AI_BASE_URL=http://127.0.0.1:8080/v1
+LOCAL_AI_MODEL=
+LOCAL_AI_RUNTIME=llamacpp
+LOCAL_AI_TIMEOUT_MS=600000
+LOCAL_AI_MAX_TOKENS=16384
+LOCAL_AI_SAMPLING=auto
+LOCAL_AI_API_KEY=
+# Optional startup default: AI_PROVIDER=local
+```
+
+Restart AniPick, choose Local, refresh models, and select the exact served ID. `LOCAL_AI_MODEL` optionally makes that ID the startup default. Use **Test AI connection**, then **Pick for Me**. Discovery does not prove generation or model suitability. Weights/runtimes stay outside Git; `.gitignore` also guards common downloaded model/runtime paths.
+
+Only HTTP bases ending in `/v1` on `127.0.0.1`, `localhost` (pinned to `127.0.0.1`), or `[::1]` are accepted. Public/LAN hosts, redirects, embedded credentials, queries, and arbitrary paths are rejected. Optional `LOCAL_AI_API_KEY` remains server-only and goes only to the local server. AniPick cannot inspect another application's forwarding behavior: choose an actual local model, not an Ollama cloud-backed model, when local computation is required. Imports/posters/embeds may still use internet services.
+
+### Ollama, LM Studio, reasoning, and limits
+
+For [Ollama](https://docs.ollama.com/api/openai-compatibility), set base `http://127.0.0.1:11434/v1` and runtime `ollama`; for [LM Studio](https://lmstudio.ai/docs/developer/openai-compat), use `http://127.0.0.1:1234/v1` and `lmstudio`. Start a loopback server with a supported model and refresh AniPick's list. These modes omit llama.cpp-only fields; verify sampler/runtime support in the host application. Embedding-only or incompatible models can appear in discovery and fail generation.
+
+PrismML's [small-model profile](https://github.com/PrismML-Eng/Bonsai-demo/blob/main/SMALL-MODELS.md) uses temperature 1, top-p .95, top-k 20, min-p 0, presence penalty 1, repetition penalty 1, and penalty window 64 for Bonsai 2 9B/4B/2B. The [27B profile](https://github.com/PrismML-Eng/Bonsai-demo#best-practices-bonsai-2-27b) uses min-p .05 and presence penalty 0. The llama.cpp adapter enables thinking with `medium` effort; it avoids unsupported `low`. Alias IDs can override detection with `LOCAL_AI_SAMPLING=bonsai2-small` or `bonsai2-27b`; `generic` disables special sampling. Non-llama.cpp hosts use standard sampling fields and their engine defaults for extensions.
+
+Separate reasoning fields are ignored. Complete leading `<think>…</think>` blocks are stripped before final JSON parsing; incomplete/thought-only and truncated responses are rejected. Reasoning is never saved or used as a recommendation. Existing candidate/history ID checks, source metadata joins, spoiler-avoidance instructions, bounded repairs, and hard filters still apply. Free-form interpretation cannot guarantee no spoilers.
+
+`LOCAL_AI_TIMEOUT_MS` governs the entire profile/ranking/repair operation: default ten minutes, range 30 seconds–30 minutes. The browser uses that deadline plus transport slack; discovery has a 15-second cap. `LOCAL_AI_MAX_TOKENS` accepts 1,024–65,536 (default 16,384 leaves room for thinking). Ensure the runtime context/memory can fit input plus output. Local cache identity includes endpoint, model, runtime, sampling profile, and output budget; Google caches remain separate.
+
+```powershell
+pnpm test:ai --local
+# Lists models; supply LOCAL_AI_MODEL or an exact ID for verification:
+pnpm test:ai --local --model=YOUR_SERVED_ID --probe
+# Real final-JSON generation, without watchlist data.
+pnpm test:ai --local --model=YOUR_SERVED_ID --recommend --library=anilist:yourusername
+# Sends that bounded saved-library sample only to loopback.
+```
+
+**Verification:** 140 tests across 18 files, TypeScript, ESLint, and the production build passed. No server responded on ports 8080, 11434, or 1234; the real probe returned `LOCAL_AI_UNREACHABLE`. Live Bonsai/Ollama/LM Studio inference remains **unverified**. Injected HTTP-server/transport tests establish protocol, consent, membership, validation, and cache behavior, not actual model quality. Google's live access check returned HTTP 400 with `API_KEY_INVALID` for the current local credential. Replace it locally and restart for live cloud use; Google regression tests pass, but no new successful live cloud generation is claimed. Browser settings were reviewed at desktop/mobile widths; no watchlist inference was triggered in that review.
+
 ## Persistence and configuration
 
 | Variable | Default | Purpose |
@@ -87,7 +152,7 @@ Pick for Me adds explicit, consented AI taste analysis and mood-based ranking. A
 | `ANIPICK_DB_PATH` | `./data/anipick.sqlite` | Durable local SQLite database, relative to launch directory. |
 | `MAL_CLIENT_ID` | unset | Server-only application client ID for public MAL lists. |
 | `GEMINI_API_KEY` | unset | Server-only Google AI Studio key for Gemma inference. |
-| `AI_PROVIDER` | `google` | Current adapter; the provider-neutral interface permits future adapters. |
+| `AI_PROVIDER` | `google` | Startup default: `google` or `local`; the UI can switch without changing Google configuration. |
 | `AI_MODEL` | `gemma-4-26b-a4b-it` | Configurable Gemma 4 instruction-tuned model ID. Access is checked with the configured key. |
 
 Run commands from the repository root. The ignored `data/` directory contains watchlists, metadata, and SQLite WAL files. Back it up with the app stopped. This is local storage, not encryption or browser-local storage; other users with filesystem access can read it. Removing it intentionally resets the library.
@@ -165,9 +230,9 @@ Gemma-specific docs do not establish native JSON Schema decoding support for thi
 
 Google currently lists Gemma 4 input/output under its [free tier](https://ai.google.dev/gemini-api/docs/pricing#gemma-4); actual access and capacity depend on the account. [Active rate limits](https://ai.google.dev/gemini-api/docs/rate-limits) are project-specific and must be checked in AI Studio. No fixed RPM/TPM quota is promised. Review Google's current [API terms](https://ai.google.dev/gemini-api/terms), regional conditions, and data handling before sending a watchlist. Free service availability and data-use terms can change.
 
-`RecommendationProvider` keeps inference separate from import, filtering, validation, and storage. A future Qwen3.8-27B adapter can implement that interface using an eligible provider's verified API/model ID. The [official Qwen model repository](https://huggingface.co/Qwen/Qwen3.8-27B) is a weight identifier, **not a verified hosted API ID**. Qwen inference is not implemented in this milestone; setting `AI_PROVIDER=qwen` returns a configuration message. No closed model or GPT-OSS fallback is selected.
+`RecommendationProvider` keeps inference separate from import, filtering, validation, and storage. The loopback adapter can use other models under their real served IDs, provided the engine supports them. There is no dedicated Qwen hosted adapter; `AI_PROVIDER=qwen` is not supported. A weight repository name is not automatically a hosted API ID. No closed model or GPT-OSS fallback is selected.
 
-Open weights matter because inference is replaceable: a future adapter can change hosts or use an actually running local model without replacing the user's library or application rules. A hosted model avoids local hardware requirements but transmits selected watchlist data and depends on provider limits and pricing. This implementation is cloud inference, not offline inference.
+Open weights matter because inference is replaceable: the optional loopback adapter uses a separately running local model without replacing the user's library or application rules. Hosted Gemma avoids local hardware requirements but transmits selected data and depends on provider limits/pricing. Local inference instead depends on your hardware and runtime; import and media features still use external services.
 
 ### What the AI actually does
 
@@ -187,7 +252,7 @@ Identical simultaneous requests share one analysis. Other simultaneous analyses 
 
 If even one recommendation is rate limited, remember that the result count is not the number of input tokens: the model still compares candidates and analyzes history in separate calls. AniPick does not send a full 500-title library, but large samples and two close-together requests can consume a per-minute token quota. Use the specific error and [AI Studio usage](https://aistudio.google.com/rate-limit) to distinguish this from a daily quota or project access restriction. Quotas are shared by the Google project; creating another key in the same project does not create a new quota. A successful connection check verifies model access, not inference quota headroom.
 
-Cache contents include generated taste descriptions and sample history references and are stored locally alongside the watchlist. Cloud consent is required by the backend request schema, not just the UI. API keys are sent only in HTTPS headers to the fixed Google endpoint; redirects are refused. No key is stored in SQLite, the browser, logs, URLs, or source control.
+Cache contents include generated taste descriptions and sample history references and are stored locally alongside the watchlist. The backend enforces consent for cloud requests, including cache reads; local requests do not require Google consent. Google's key goes only in HTTPS headers to its fixed endpoint, and an optional local key goes only to the validated loopback server. Redirects are refused. No key is stored in SQLite, the browser, logs, URLs, or source control.
 
 ## Anime previews and community videos
 
@@ -281,7 +346,7 @@ pnpm test:audit --infer
 - **Screenshots and browser review:** capture real Library, recommendation, preview, and phone-width screens. Check keyboard/focus and real YouTube/TikTok playback, including a removed/restricted video and save/reopen/remove of a relevant community link. HTTP and static-markup tests do not replace these checks.
 - **Upstream verification:** add a MAL client ID and verify an actual public MAL list; retry live Jikan when reachable. Imported AniList details and saved browsing remain usable without enrichment.
 - **AI scope:** bounded samples do not cover every backlog title. Sparse ratings reduce personalization, natural-language interpretations can be mistaken, and quota/access limits can still block generation. One suggestion still requires input tokens.
-- **Provider support:** Google-hosted Gemma is the only implemented inference provider. Qwen3.8-27B and local inference are future adapters, not supported configurations today. Hosted inference sends selected data to Google; it is not offline AI.
+- **Provider support:** Google/Gemma and optional loopback OpenAI-compatible adapters are implemented. Qwen3.8-27B is not a verified hosted configuration; a compatible local model can be selected only under its real served ID. Hosted inference sends selected data to Google; local computation requires a separately running local model.
 - **Unknown data:** no automated verified-dub or streaming-availability source exists. Do not interpret unknown metadata as confirmed absence. No account writes, payments, authentication, or public hosting setup is included.
 - **Repository/submission:** this checkout has no `.git` directory or root application `LICENSE`. A public repository, owner-chosen project license, project-window provenance, and the submission post still need owner attention. This audit did not initialize Git, commit, publish, or submit anything.
 

@@ -5,7 +5,7 @@ export interface InferenceRequest {
   signal: AbortSignal;
 }
 
-// A future Qwen adapter implements this same provider-neutral JSON boundary.
+// Cloud and loopback adapters share the same validated recommendation boundary.
 export interface RecommendationProvider {
   readonly provider: string;
   readonly model: string;

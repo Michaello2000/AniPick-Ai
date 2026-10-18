@@ -1,6 +1,7 @@
 import { resolve } from 'node:path';
 import { z } from 'zod';
-import { configureAi } from '../server/recommendations/config.js';
+import { configureAi, selectAi } from '../server/recommendations/config.js';
+import { LocalRecommendationProvider } from '../server/recommendations/local.js';
 import { RecommendationService } from '../server/recommendations/service.js';
 import { LibraryStore } from '../server/storage.js';
 import { recommendationPreferencesSchema } from '../shared/recommendations.js';
@@ -9,9 +10,18 @@ import { ApiError } from '../server/upstream.js';
 // --recommend explicitly authorizes sending the selected real library sample.
 // Without it, this checks model access only and sends no watchlist data.
 const args = process.argv.slice(2).filter(arg => arg !== '--');
-const configuration = configureAi(process.env);
+let configuration = configureAi(process.env);
 let store: LibraryStore | undefined;
 try {
+  if (args.includes('--local')) {
+    const local = configuration.local;
+    if (!local?.settings) throw new ApiError('LOCAL_AI_CONFIG', local?.message || 'Local inference is not configured.', 503);
+    const available = await new LocalRecommendationProvider(local.settings, '').models(AbortSignal.timeout(15000));
+    console.log('Local model discovery: PASS', JSON.stringify({ models: available }));
+    const model = args.find(arg => arg.startsWith('--model='))?.slice('--model='.length) ?? local.model;
+    if (!model) throw new ApiError('LOCAL_MODEL_UNAVAILABLE', 'Choose an actual discovered model with --model=ID or LOCAL_AI_MODEL.', 400);
+    configuration = { ...configuration, ...selectAi(configuration, { mode: 'local', model }), local: { ...local, model } };
+  }
   if (!configuration.provider) throw new ApiError('AI_NOT_CONFIGURED', configuration.status.message, 503);
   await configuration.provider.verify(AbortSignal.timeout(15000));
   console.log(`Model access: PASS (${configuration.status.provider}, ${configuration.status.model})`);
@@ -19,7 +29,7 @@ try {
     const reply = await configuration.provider.generate({
       system: 'This is an API connectivity check. Return only {"ready":true}.',
       data: { task: 'Confirm the API can generate JSON.' }, schema: { type: 'object', properties: { ready: { type: 'boolean' } }, required: ['ready'], additionalProperties: false },
-      signal: AbortSignal.timeout(45000),
+      signal: AbortSignal.timeout(configuration.status.timeoutMs ?? 45000),
     });
     z.strictObject({ ready: z.literal(true) }).parse(reply);
     console.log('Real JSON generation: PASS (no watchlist data sent)');

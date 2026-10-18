@@ -11,10 +11,16 @@ export const recommendationPreferencesSchema = z.strictObject({
   maxResults: z.number().int().min(1).max(5).default(5),
 });
 export type RecommendationPreferences = z.infer<typeof recommendationPreferencesSchema>;
+export const aiSelectionSchema = z.strictObject({
+  mode: z.enum(['cloud', 'local']).optional(),
+  model: z.string().trim().min(1).max(500).optional(),
+});
+export type AiSelection = z.infer<typeof aiSelectionSchema>;
 export const recommendationRequestSchema = z.strictObject({
   libraryId: z.string().min(1).max(100),
   preferences: recommendationPreferencesSchema,
-  allowCloudProcessing: z.literal(true),
+  allowCloudProcessing: z.boolean().default(false),
+  ai: aiSelectionSchema.optional(),
 });
 export type RecommendationRequest = z.infer<typeof recommendationRequestSchema>;
 
@@ -44,10 +50,15 @@ export type Ranking = z.infer<typeof rankingSchema>;
 
 export const aiStatusSchema = z.object({
   configured: z.boolean(), provider: z.string(), model: z.string(), message: z.string(),
+  mode: z.enum(['cloud', 'local']).optional(), timeoutMs: z.number().int().positive().optional(),
 });
 export type AiStatus = z.infer<typeof aiStatusSchema>;
+export const localModelsSchema = z.object({
+  models: z.array(z.string()), baseUrl: z.string(), timeoutMs: z.number(), defaultModel: z.string(),
+});
 export const recommendationContextSchema = z.object({
   ai: aiStatusSchema, totalHistory: z.number(), totalPlanning: z.number(),
+  cloud: aiStatusSchema.optional(),
   verifiedDubs: z.number(), genres: z.array(z.string()),
 });
 export type RecommendationContext = z.infer<typeof recommendationContextSchema>;

@@ -19,6 +19,7 @@ Use neutral charcoal, warm white, and one vermilion accent. Avoid purple gradien
 
 - **Library:** restrained navigation, an artwork-led introduction using only real saved Plan to Watch titles, then status navigation, search, and a full-width poster grid.
 - **Pick for Me:** its own destination. Length and mood lead; the explicit cloud consent and primary action stay visible. Genre, airing, suggestion count, and verified-dub controls remain in Advanced preferences. Connection settings and technical disclosures belong in a separate details element.
+- **AI settings:** retain that disclosure for Cloud/Local selection, with a native server-discovered model select and refresh/recovery controls. Local mode replaces Google consent with concise loopback processing information. No model cards, install wizard, or new palette; reuse existing segmented controls, selects, focus rings, and spacing. Unavailable local inference disables generation without switching providers.
 - **Import:** a visible header action opens an inline library manager. The manager starts open before the first import. Both username providers have equal prominence; saved-library switching, refresh, progress, and recovery remain functional.
 - Keep Pick for Me mounted when navigating so an in-flight request, consent selection, or generated result is not discarded.
 - Anime details remain a native modal dialog with protected focus, Escape support, and a clearly labeled close button.
@@ -70,3 +71,5 @@ The implementation in `src/styles.css` is the source of truth.
 ## Verification
 
 Run existing tests, TypeScript, ESLint, and the production build. Review the real app at desktop and phone widths when browser access is available: saved and empty libraries, import controls, search, filters, detail focus, Pick for Me consent, advanced settings, loading, and error states. Do not trigger imports, refreshes, or paid/cloud inference merely for a visual screenshot. Browser access unavailable at the start of this pass; record the final verification honestly in the delivery.
+
+The subsequent local-AI settings pass was reviewed in Brave at 1440×1000 and 390×844. Cloud/Local keyboard selection, consent reset, unavailable-server recovery, disabled generation, and page overflow were checked; screenshots live in `docs/screenshots/`. No inference or watchlist refresh was triggered during that UI review. Successful local model output and broader playback review remain unverified.

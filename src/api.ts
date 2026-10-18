@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { capabilitiesSchema, librarySchema, librarySummarySchema, metadataSchema, progressSchema, type Provider } from '../shared/model.js';
-import { aiStatusSchema, recommendationContextSchema, recommendationResponseSchema, type RecommendationRequest } from '../shared/recommendations.js';
+import { aiStatusSchema, localModelsSchema, recommendationContextSchema, recommendationResponseSchema, type AiSelection, type RecommendationRequest } from '../shared/recommendations.js';
 import { savedTikTokSchema, trailerResponseSchema } from '../shared/media.js';
 
 const errorSchema = z.object({ error: z.object({ code: z.string(), message: z.string() }) });
@@ -27,9 +27,10 @@ export const api = {
   saveTikTok: (id: string, url: string) => request(`/anime/${encodeURIComponent(id)}/tiktok`, savedTikTokSchema, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) }),
   deleteTikTok: (id: string, videoId: string) => request(`/anime/${encodeURIComponent(id)}/tiktok/${encodeURIComponent(videoId)}`, z.object({ removed: z.boolean() }), { method: 'DELETE' }),
   recommendationContext: (id: string, signal?: AbortSignal) => request(`/libraries/${encodeURIComponent(id)}/recommendation-context`, recommendationContextSchema, { signal }),
-  checkAi: () => request('/ai/check', aiStatusSchema, { method: 'POST', signal: AbortSignal.timeout(20000) }),
-  recommend: (input: RecommendationRequest, signal: AbortSignal) => request('/recommendations', recommendationResponseSchema, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input), signal: AbortSignal.any([signal, AbortSignal.timeout(130000)]),
+  localModels: (signal: AbortSignal) => request('/ai/models', localModelsSchema, { signal: AbortSignal.any([signal, AbortSignal.timeout(20000)]) }),
+  checkAi: (selection: AiSelection = {}) => request('/ai/check', aiStatusSchema, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(selection), signal: AbortSignal.timeout(20000) }),
+  recommend: (input: RecommendationRequest, signal: AbortSignal, timeoutMs = 120000) => request('/recommendations', recommendationResponseSchema, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input), signal: AbortSignal.any([signal, AbortSignal.timeout(timeoutMs + 10000)]),
   }),
 };
 
