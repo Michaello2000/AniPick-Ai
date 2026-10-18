@@ -1,381 +1,153 @@
 # AniPick
 
-Your next watch is already on your list. AniPick is a new, localhost-first anime watchlist companion built for Hacktoberfest 2026 Week 2. This repository was implemented from scratch; no previous AniPick code was used.
+### Full backlog? Let us choose for you.
 
-**Milestones 1–4: real imports, a durable watchlist browser, open-weight AI recommendations, a dedicated interface redesign, and anime previews.** Pick for Me calls the real model when a server-side Google AI Studio key is configured. Real default-settings generation has been verified through the backend, as detailed below. No demo recommendations or fake model fallback are included.
+AniPick helps you choose your next anime from your own **Plan to Watch** list.
+Import a public AniList or MyAnimeList watchlist, browse your backlog, then pick a
+length and mood. An open-weight AI analyzes your watch history and personal ratings
+to suggest titles from your list, with explanations grounded in that history.
 
-The interface has separate **Library** and **Pick for Me** destinations. **Import list** opens the library manager, where AniList and MyAnimeList are equally accessible and saved collections can be switched. Search and sorting stay visible; **Filters** reveals genre and total-length options. Pick for Me leads with length and mood, keeps explicit cloud consent visible, and places advanced preferences and provider diagnostics in disclosures. Navigating back to Library preserves an in-progress AI request and current preferences.
+Built from scratch for Hacktoberfest 2026 Week 2. **Localhost-first:** your library
+stays on your machine, while imports, artwork, cloud AI, and media use online services.
 
-The visual system is documented in [DESIGN.md](DESIGN.md), with product constraints in [PRODUCT.md](PRODUCT.md). Anime artwork always comes from the real imported library. Manrope is self-hosted under its bundled SIL Open Font License; the browser does not contact a font CDN.
+[Quick Start](#quick-start) · [Import a list](#watchlist-imports) · [AI setup](#ai-configuration) · [Documentation](#documentation)
 
-## Screenshots
+## See AniPick
 
-Actual production interface with blue accents, local AniList/MAL logos, and in-app MAL setup. The credential field is empty; no fabricated successful MAL import is shown.
+![AniPick Library with the current hero and a real imported AniList collection](docs/screenshots/anipick.jpg)
 
-![AniPick blue import page and MAL setup](docs/screenshots/anipick.jpg)
+<details>
+<summary>More screenshots: Library and Pick for Me</summary>
 
-[Phone-width MAL setup screenshot](docs/screenshots/blue-mal-setup-mobile.jpg). The current import screen was reviewed at 1280px and 390px without horizontal overflow. Cloud/Local settings were also previously checked for keyboard selection, consent reset, and unavailable-server recovery. Full successful-result and video-playback review remains outstanding.
+**Browse your backlog**
 
-## Run locally
+![Library with anime covers, list statuses, search, filters, and community scores](docs/screenshots/anipick_library.png)
 
-Requires **Node.js 24+** (uses built-in `node:sqlite`) and **pnpm 11+**. No database installation, public domain, cloud hosting, or AI key is needed.
+**Choose a length and mood**
 
-The Google key is needed only for new cloud recommendations; local inference needs a running compatible server instead. If PowerShell says `pnpm` is not recognized, install Node.js 24+ from the [official download page](https://nodejs.org/en/download), reopen PowerShell, and run `npm.cmd install --global pnpm@11.25.0`. Use `pnpm.cmd` in place of `pnpm` if PowerShell script execution is restricted. Tools available inside a coding agent's environment may not be on your terminal's PATH.
+![Pick for Me preferences, advanced filters, and cloud consent before generation](docs/screenshots/anipick_pick_for_me.jpg)
 
-```powershell
+</details>
+
+**Presentation video: pending.** A recording link will be added here when available.
+The screenshots show the application and recommendation controls, not a generated result.
+
+## Key features
+
+- **Real watchlists:** AniList and MAL username imports, pagination, all list statuses,
+  personal ratings, saved-library switching, and refresh with progress and retry controls.
+- **A useful backlog browser:** artwork, title search, sorting, genre and length filters,
+  detailed anime information, and durable SQLite storage. Browsing needs no AI key.
+- **Personalized picks:** model-generated taste profiles and candidate rankings, history
+  citations, qualitative confidence, and visible sample coverage. No fake AI fallback.
+- **Filters the model must respect:** Plan to Watch only; No limit, ≤12 episodes,
+  ≤24 episodes, Movie, or ≥25 episodes. These describe total anime length, not tonight's free time.
+- **Your inference choice:** Google AI Studio or a separately running local model server,
+  with validated responses and cached profiles/results.
+- **Optional previews:** click-to-load source-listed YouTube trailers, TikTok search,
+  and user-saved video links. No video scraping, downloading, rehosting, or autoplay.
+
+## Quick Start
+
+Requires **Node.js 24+** and **pnpm 11+**; the project pins pnpm 11.25.0.
+No separate database installation, public domain, or cloud hosting is required.
+
+```sh
+git clone https://github.com/Michaello2000/AniPick-Ai.git
+cd AniPick-Ai
 pnpm install
-if (!(Test-Path .env)) { Copy-Item .env.example .env }
 pnpm dev
 ```
 
-Open [http://127.0.0.1:5173](http://127.0.0.1:5173). The API runs at `127.0.0.1:3001`; Vite proxies `/api` to it. Both bind to loopback. Stop both with Ctrl+C.
+Open [127.0.0.1:5173](http://127.0.0.1:5173). The API runs on port 3001;
+both services bind to loopback. Ctrl+C stops them. AniList imports work immediately.
+For optional credentials, copy [.env.example](.env.example) to a new `.env`, add your
+settings, and restart. Keep an existing `.env` rather than overwriting it.
 
-Production mode, entirely on your own machine:
+To run the production build locally:
 
-```powershell
+```sh
 pnpm build
 pnpm start
 ```
 
-Open [http://127.0.0.1:3001](http://127.0.0.1:3001). Express serves the built React app and API together. `.env` is read by both launch commands. An empty database is created automatically on first run.
+Open [127.0.0.1:3001](http://127.0.0.1:3001). See [Setup](docs/SETUP.md)
+for Windows/pnpm troubleshooting, configuration, and local data management.
 
-## Importing real lists
+## Watchlist imports
 
-### AniList
+**AniList:** choose AniList, enter a public username, and select **Import list**.
+No API key or OAuth login is needed.
 
-Select **AniList**, enter a public username, and choose **Import list**. No key or OAuth is needed. The importer reads the user's scoring format, then retrieves every `MediaListCollection` chunk, including every list status. Custom-list duplicates are deduplicated by provider ID. Scores explicitly request the user's native scale and a separate AniList conversion to 100 points; an unspecified score format is unreliable in collection responses.
+**MyAnimeList:** register an application at [MAL API configuration](https://myanimelist.net/apiconfig).
+In AniPick's import screen, choose MyAnimeList, paste the application's **Client ID**,
+and select **Save and enable MAL**. Alternatively, set `MAL_CLIENT_ID` in `.env`
+and restart. Viewers need no OAuth login; client secrets and access tokens are unused.
 
-### MyAnimeList: required API correction
+MAL lists use the official v2 API; Jikan supplies optional detail/trailer metadata.
+Personal ratings stay separate from community scores, and unscored titles remain **Unrated**.
+See [import setup and behavior](docs/SETUP.md#importing-real-lists).
 
-**Hosted Jikan no longer exposes full user anime lists.** Its [published deprecation notice](https://jikan.docs.apiary.io/) records removal of these endpoints in May 2022. Calling the removed endpoint, or using favorites/history instead, cannot import a complete watchlist.
+## AI configuration
 
-With the developer's approval, AniPick uses the **official MAL v2 public-list API** for list membership, status, ratings, and baseline metadata. **Jikan v4** supplies additional anime synopsis, genres, themes, and demographics on opening a detail view. This is metadata enrichment, not a media integration. It is lazy-loaded and cached in SQLite for seven days. A Jikan failure leaves imported details and browsing available.
-
-To enable MAL:
-
-1. Sign in to your own MAL account and register an application at [MAL API configuration](https://myanimelist.net/apiconfig). Follow MAL's current registration requirements and use localhost application/callback URLs where accepted. AniPick itself does not perform an OAuth callback.
-2. Put the application's **client ID** in `.env`:
-
-   ```dotenv
-   MAL_CLIENT_ID=your_application_client_id
-   ```
-
-3. Restart AniPick. Select **MyAnimeList** and import a public username.
-
-The app sends `X-MAL-CLIENT-ID` from the server. **Viewers do not need OAuth or a login.** A client secret or access token is not used. Never put credentials into `VITE_*` variables, URLs, browser code, or source control. `.env` is ignored. Without a client ID, MAL displays an explicit setup error; AniList and saved libraries still work.
-
-On a freshly cloned copy, `.env.example` contains empty credentials on purpose. Your Google AI Studio key enables cloud recommendations; it cannot authenticate MAL imports. **You can now configure MAL on the import page:** select MyAnimeList, follow the registration link, paste your application's **Client ID**, and choose **Save and enable MAL**. AniPick validates it with the official API before saving it in the local, ignored SQLite database; imports become available immediately without a restart. Invalid credentials are not saved, and the stored ID is never returned to the browser. A saved ID takes precedence over `MAL_CLIENT_ID` in `.env`; the environment-variable setup remains supported. AniList imports need neither credential. If the UI reports an unreadable API response, launch `pnpm dev` (both frontend and backend), rather than Vite alone.
-
-MAL retrieves all statuses with 500-entry offset pagination and follows only validated offsets under the original official API path. Rich metadata is requested alongside list entries, avoiding thousands of Jikan calls during import. IDs, never title similarity, link Jikan enrichment to MAL entries.
-
-## What is implemented
-
-- Equally visible username import choices; no demo data in the application.
-- All relevant statuses, including AniList rewatching; progress and rewatch metadata where provided.
-- Stable provider-prefixed IDs and explicit AniList/MAL cross-reference IDs when supplied by the source. Separate accounts and providers remain separate libraries.
-- Personal scores retain source values and scale; zero/unscored becomes **Unrated**, not a negative taste signal. Community scores remain separate and preserve their source scale. Cover badges display community scores converted to `/10`.
-- Title variants, poster, plain-text synopsis, genres/tags, format, total episodes, airing status, release year, source timestamps, and list metadata where supplied. Missing metadata stays unknown. MAL does not supply a meaningful list-entry creation date, so AniPick does not invent one.
-- Dark responsive UI, keyboard-accessible controls and native detail dialog, lazy cover images, saved-account switching, status browsing, title search, genre filter, and sorting.
-- **Plan to Watch** is the default. Total anime length filters are unrestricted, **≤12**, **≤24**, **movie**, and **≥25** episodes. Unknown episode counts appear only under unrestricted length, or movie when the format is known to be a movie. Movies can also match numeric episode boundaries.
-- Atomic SQLite snapshots. Only a fully successful import replaces the saved library. Refreshes never erase a previous list on a page or network failure. A successful empty import is saved as empty.
-- Visible page/count progress, manual retry and refresh controls, active-import recovery after browser reload, transient retry with bounded exponential backoff, `Retry-After` support, conservative provider pacing, and a one-minute refresh cooldown.
-- Search/sort/filter and saved-list browsing need no upstream call. Poster loading and uncached detail enrichment do require a network connection.
-
-Pick for Me adds explicit, consented AI taste analysis and mood-based ranking. Anime details include source-listed YouTube trailers, search fallbacks, TikTok discovery, and saved community video links, as described below. External account writes and an automated dub-data integration are not implemented. Imported dub availability remains **Unknown** unless an attributable server-side record exists; the UI disables the verified-dub filter when there are no such records.
-
-## Optional local AI: Bonsai 2
-
-Open **Pick for Me → AI settings** and choose **Cloud** or **Local**. Cloud keeps Google/Gemma and its consent checkbox. Local discovers model IDs from `/v1/models`; Bonsai 2 9B and 27B are prioritized, and other compatible models remain selectable. Local requires no Google consent/key and never falls back to cloud. Startup defaults come from `.env`; selections remain while the app stays open.
-
-### Windows setup
-
-Use [PrismML's official Bonsai-demo](https://github.com/PrismML-Eng/Bonsai-demo), **outside this repository**. Review its setup script and hardware requirements before running; downloads can be large. AniPick does not download weights or start the runtime.
-
-In a separate PowerShell window:
-
-```powershell
-Set-Location $env:USERPROFILE
-git clone https://github.com/PrismML-Eng/Bonsai-demo.git
-Set-Location Bonsai-demo
-$env:BONSAI_FAMILY='bonsai2'
-$env:BONSAI_MODEL='9B'  # Or '27B'; run setup for the chosen size
-$env:BONSAI_HOST='127.0.0.1'
-.\setup.ps1
-.\scripts\start_llama_server.ps1
-```
-
-If Windows blocks scripts, follow PrismML's documented process-scoped execution-policy instructions after reviewing them. Keep loopback binding; do not use `0.0.0.0` or enable public/LAN sharing. Leave this server running and start AniPick in another terminal.
-
-Optimized `PQ2_0`/`PTQ1_0` GGUF packs need PrismML's fork; official `Q2_0` needs a recent upstream runtime with Bonsai 2 integration. Use the demo's matching runtime rather than assuming any GGUF engine works. See [model formats](https://github.com/PrismML-Eng/Bonsai-demo/blob/main/MODEL-FORMATS.md). Ollama/LM Studio bundle their own engines; API compatibility does not establish optimized Bonsai weight support.
-
-Add to AniPick's existing `.env`, keeping Google configuration:
+**Cloud:** obtain a [Google AI Studio key](https://aistudio.google.com/apikey), then add:
 
 ```dotenv
-LOCAL_AI_BASE_URL=http://127.0.0.1:8080/v1
-LOCAL_AI_MODEL=
-LOCAL_AI_RUNTIME=llamacpp
-LOCAL_AI_TIMEOUT_MS=600000
-LOCAL_AI_MAX_TOKENS=16384
-LOCAL_AI_SAMPLING=auto
-LOCAL_AI_API_KEY=
-# Optional startup default: AI_PROVIDER=local
-```
-
-Restart AniPick, choose Local, refresh models, and select the exact served ID. `LOCAL_AI_MODEL` optionally makes that ID the startup default. Use **Test AI connection**, then **Pick for Me**. Discovery does not prove generation or model suitability. Weights/runtimes stay outside Git; `.gitignore` also guards common downloaded model/runtime paths.
-
-Only HTTP bases ending in `/v1` on `127.0.0.1`, `localhost` (pinned to `127.0.0.1`), or `[::1]` are accepted. Public/LAN hosts, redirects, embedded credentials, queries, and arbitrary paths are rejected. Optional `LOCAL_AI_API_KEY` remains server-only and goes only to the local server. AniPick cannot inspect another application's forwarding behavior: choose an actual local model, not an Ollama cloud-backed model, when local computation is required. Imports/posters/embeds may still use internet services.
-
-### Ollama, LM Studio, reasoning, and limits
-
-For [Ollama](https://docs.ollama.com/api/openai-compatibility), set base `http://127.0.0.1:11434/v1` and runtime `ollama`; for [LM Studio](https://lmstudio.ai/docs/developer/openai-compat), use `http://127.0.0.1:1234/v1` and `lmstudio`. Start a loopback server with a supported model and refresh AniPick's list. These modes omit llama.cpp-only fields; verify sampler/runtime support in the host application. Embedding-only or incompatible models can appear in discovery and fail generation.
-
-PrismML's [small-model profile](https://github.com/PrismML-Eng/Bonsai-demo/blob/main/SMALL-MODELS.md) uses temperature 1, top-p .95, top-k 20, min-p 0, presence penalty 1, repetition penalty 1, and penalty window 64 for Bonsai 2 9B/4B/2B. The [27B profile](https://github.com/PrismML-Eng/Bonsai-demo#best-practices-bonsai-2-27b) uses min-p .05 and presence penalty 0. The llama.cpp adapter enables thinking with `medium` effort; it avoids unsupported `low`. Alias IDs can override detection with `LOCAL_AI_SAMPLING=bonsai2-small` or `bonsai2-27b`; `generic` disables special sampling. Non-llama.cpp hosts use standard sampling fields and their engine defaults for extensions.
-
-Separate reasoning fields are ignored. Complete leading `<think>…</think>` blocks are stripped before final JSON parsing; incomplete/thought-only and truncated responses are rejected. Reasoning is never saved or used as a recommendation. Existing candidate/history ID checks, source metadata joins, spoiler-avoidance instructions, bounded repairs, and hard filters still apply. Free-form interpretation cannot guarantee no spoilers.
-
-`LOCAL_AI_TIMEOUT_MS` governs the entire profile/ranking/repair operation: default ten minutes, range 30 seconds–30 minutes. The browser uses that deadline plus transport slack; discovery has a 15-second cap. `LOCAL_AI_MAX_TOKENS` accepts 1,024–65,536 (default 16,384 leaves room for thinking). Ensure the runtime context/memory can fit input plus output. Local cache identity includes endpoint, model, runtime, sampling profile, and output budget; Google caches remain separate.
-
-```powershell
-pnpm test:ai --local
-# Lists models; supply LOCAL_AI_MODEL or an exact ID for verification:
-pnpm test:ai --local --model=YOUR_SERVED_ID --probe
-# Real final-JSON generation, without watchlist data.
-pnpm test:ai --local --model=YOUR_SERVED_ID --recommend --library=anilist:yourusername
-# Sends that bounded saved-library sample only to loopback.
-```
-
-**Verification:** 140 tests across 18 files, TypeScript, ESLint, and the production build passed. No server responded on ports 8080, 11434, or 1234; the real probe returned `LOCAL_AI_UNREACHABLE`. Live Bonsai/Ollama/LM Studio inference remains **unverified**. Injected HTTP-server/transport tests establish protocol, consent, membership, validation, and cache behavior, not actual model quality. Google's live access check returned HTTP 400 with `API_KEY_INVALID` for the current local credential. Replace it locally and restart for live cloud use; Google regression tests pass, but no new successful live cloud generation is claimed. Browser settings were reviewed at desktop/mobile widths; no watchlist inference was triggered in that review.
-
-## Persistence and configuration
-
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `PORT` | `3001` | Local API/production server port; Vite uses the same configured target. |
-| `ANIPICK_DB_PATH` | `./data/anipick.sqlite` | Durable local SQLite database, relative to launch directory. |
-| `MAL_CLIENT_ID` | unset | Server-only application client ID for public MAL lists. |
-| `GEMINI_API_KEY` | unset | Server-only Google AI Studio key for Gemma inference. |
-| `AI_PROVIDER` | `google` | Startup default: `google` or `local`; the UI can switch without changing Google configuration. |
-| `AI_MODEL` | `gemma-4-26b-a4b-it` | Configurable Gemma 4 instruction-tuned model ID. Access is checked with the configured key. |
-
-Run commands from the repository root. The ignored `data/` directory contains watchlists, metadata, and SQLite WAL files. Back it up with the app stopped. This is local storage, not encryption or browser-local storage; other users with filesystem access can read it. Removing it intentionally resets the library.
-
-The complete safe example also ships in [.env.example](.env.example). Empty values are intentional; insert your own credentials locally:
-
-```dotenv
-PORT=3001
-ANIPICK_DB_PATH=./data/anipick.sqlite
-MAL_CLIENT_ID=
-GEMINI_API_KEY=
+GEMINI_API_KEY=your_key_here
 AI_PROVIDER=google
 AI_MODEL=gemma-4-26b-a4b-it
 ```
 
-Completed lists and metadata survive process restarts. Active import jobs are held in memory: if the server restarts, retry the import; the last saved snapshot remains. Imports run one at a time. Large lists can take minutes. A 200-chunk/page safety ceiling fails explicitly rather than saving a truncated list. Lists are not automatically refreshed; use **Refresh list**. After seven days, Jikan metadata is refreshed on demand.
+Restart, open **Pick for Me**, choose length/mood, and consent before generating.
+Cloud mode sends a bounded sample of history, ratings, and candidate metadata to Google.
+Access and quotas depend on your account. Keep keys server-only in `.env`, never
+in `VITE_*`, URLs, screenshots, or Git. See [Recommendations](docs/RECOMMENDATIONS.md).
 
-To remove an imported library, open **Manage libraries**, choose **Remove** beside its saved account, and confirm. This deletes that local library snapshot, never the external AniList/MAL list. Other saved libraries remain; removing the active one opens another, or returns to the import screen when none remain. All derived AI caches are cleared because existing hashed cache entries have no per-account index. Shared anime metadata and saved video links remain. Removal waits until current imports/AI analyses finish so an in-flight operation cannot restore deleted data. Refresh/restart does not bring the removed list back unless you import it again.
+**Local (optional):** start a compatible model server separately, then choose **Local**
+in AI settings, refresh models, and select its exact model ID. Bonsai 2 via PrismML's
+llama.cpp runtime, Ollama, and LM Studio have configuration guidance in [Local AI](docs/LOCAL_AI.md).
+AniPick does not install weights or launch the server. Local mode needs no Google key
+and never falls back to cloud. **Live local-model inference remains unverified.**
 
-There is no analytics. Import requests go to the chosen anime provider; details with a known MAL ID may call Jikan. Cover art loads from third-party image hosts. Only an explicit Pick for Me request with cloud consent sends a bounded watchlist sample to Google. External synopses and model prose are rendered as text. The local API checks Host and Origin and the production app uses a restrictive content security policy.
+Open weights let you replace the inference runtime while keeping your library and app
+rules. Cloud avoids local hardware requirements; local inference uses your hardware.
+The application as a whole is **not fully offline** in either mode.
 
-## Architecture
+## Technology stack
 
-```text
-src/                       React browser and accessible detail view
-shared/model.ts            Zod-validated normalized model and API contracts
-shared/filter.ts           Deterministic candidate/search/filter boundaries
-server/app.ts              Express API, import jobs, localhost request checks
-server/importers.ts        AniList GraphQL and official MAL public-list adapter
-server/normalize.ts        Provider validation, rating conversion, normalization
-server/upstream.ts         Shared rate pacing, timeouts, retries, actionable errors
-server/storage.ts          SQLite snapshot persistence and metadata cache
-server/metadata.ts         Lazy Jikan metadata enrichment and request deduplication
-server/recommendations/    Google adapter, bounded inputs, validation, cache orchestration
-shared/recommendations.ts  Runtime schemas for preferences, taste profiles and results
-src/PickForMe.tsx          Consent, preferences, taste profile and source-grounded results
-tests/                     Deterministic tests; fixtures never enter app data
-scripts/live-check.ts      Opt-in live imports using a disposable database
-docs/ANIPICK_AI_SYSTEM_PROMPT.md  Future taste-analysis behavior contract
-```
+React 19, TypeScript, Vite, and Tailwind CSS; a local Express API with Node's built-in
+SQLite, Zod validation, and native HTTP inference adapters. Vitest, ESLint, and TypeScript
+provide automated checks. Dependencies are locked with `pnpm-lock.yaml`.
 
-The frontend never contacts upstream list or inference APIs and receives neither the MAL client ID nor the Gemini key. A single normalized model supplies stable candidate IDs and taste history. React state is sufficient here; no additional shared-state dependency is needed. SQLite uses Node's built-in driver. Google inference uses native `fetch`, with no additional AI SDK dependency.
+## Known limitations
 
-### Configure and test real AI
+- Recommendations use bounded samples. Sparse ratings and incomplete metadata reduce
+  personalization; natural-language explanations can be mistaken or reveal spoilers.
+- MAL live-import verification was skipped in the recorded audit; Jikan requests failed.
+  Earlier cloud generation succeeded, but a later key check failed. See [Testing](docs/TESTING.md).
+- No automated verified-dub or streaming-availability source exists; unknown stays unknown.
+  External account writes and public hosting are outside the implemented scope.
+- Third-party player restrictions can block videos. Successful-result screenshots,
+  mobile captures, and a full playback review remain outstanding.
 
-1. Obtain your own key from [Google AI Studio](https://aistudio.google.com/apikey). Do not paste it into chat or the browser UI.
-2. Add these server-only settings to your existing `.env` file; do not overwrite your MAL configuration:
+## Documentation
 
-   ```dotenv
-   GEMINI_API_KEY=your_real_key
-   AI_PROVIDER=google
-   AI_MODEL=gemma-4-26b-a4b-it
-   ```
+- [Setup](docs/SETUP.md): installation, MAL credentials, environment variables, and storage.
+- [Local AI](docs/LOCAL_AI.md): Bonsai 2, runtimes, Windows setup, sampling, and compatibility.
+- [Recommendations](docs/RECOMMENDATIONS.md): selection, validation, caching, and privacy.
+- [Media](docs/MEDIA.md): trailers, TikTok links, embeds, and provider restrictions.
+- [Testing](docs/TESTING.md): commands, dated results, live audit, and demo walkthrough.
+- [Design](DESIGN.md), [Product](PRODUCT.md), [AI behavior contract](docs/ANIPICK_AI_SYSTEM_PROMPT.md), and [Agent instructions](AGENTS.md).
 
-3. Restart `pnpm dev` (or `pnpm start` after building). The browser never receives the key. Do not use `VITE_` for credentials.
-4. Import a real public list. Open **Pick for Me**, select a total anime length and mood, optionally choose genre/airing preferences, and explicitly agree to sending selected data to Google. Choose **Pick for Me**. Changing controls does not call the model.
-5. Inspect the taste profile, source-history citations and scores, recommendations, uncertainty, and disclosed sample coverage. Click a title for its imported details. Repeating identical preferences uses the durable local cache; changing only mood can reuse the taste profile.
+## License and credits
 
-Optional CLI checks:
+[MIT License](LICENSE). Watchlist/anime data: AniList, MyAnimeList, and Jikan.
+Cloud inference: Google AI Studio and Google DeepMind's Gemma. Optional local runtime:
+PrismML's Bonsai-demo and compatible model hosts. Model/runtime licenses apply separately.
 
-```powershell
-pnpm test:ai
-# Above checks authenticated model access only; no watchlist data is sent.
-pnpm test:ai --probe
-# Adds a real minimal JSON generation check, still without watchlist data.
-pnpm test:ai --recommend --library=anilist:yourusername
-# Explicitly authorizes real analysis of this saved library. Omit --library to use the latest.
-```
-
-An empty `.env` key produces a visible configuration error, never a fake result. Test fixtures are confined to `tests/`. Connection checks verify the model's `generateContent` capability before any watchlist data is sent.
-
-### Model choice, capabilities, terms, and limits
-
-Verified against Google's documentation on October 18, 2026: the [Gemma-specific Gemini API guide](https://ai.google.dev/gemma/docs/core/gemma_on_gemini_api) lists **`gemma-4-26b-a4b-it`** and **`gemma-4-31b-it`**, with `generateContent`, system instructions, and `thinkingLevel` control. AniPick defaults to 26B A4B and uses minimal thinking. The [Gemma 4 model card](https://ai.google.dev/gemma/docs/core/model_card_4) identifies these as open-weight models under Apache 2.0. A key-specific model-access check still runs at inference time; documented availability does not establish access for your account or region.
-
-Gemma-specific docs do not establish native JSON Schema decoding support for this endpoint. AniPick therefore supplies the exact JSON schema in the prompt, parses a single JSON document, and validates it with Zod and semantic checks. It deliberately does not assume that Gemini-branded structured-output capabilities automatically apply to Gemma. Thought parts and incomplete responses are never accepted as answers.
-
-Google currently lists Gemma 4 input/output under its [free tier](https://ai.google.dev/gemini-api/docs/pricing#gemma-4); actual access and capacity depend on the account. [Active rate limits](https://ai.google.dev/gemini-api/docs/rate-limits) are project-specific and must be checked in AI Studio. No fixed RPM/TPM quota is promised. Review Google's current [API terms](https://ai.google.dev/gemini-api/terms), regional conditions, and data handling before sending a watchlist. Free service availability and data-use terms can change.
-
-`RecommendationProvider` keeps inference separate from import, filtering, validation, and storage. The loopback adapter can use other models under their real served IDs, provided the engine supports them. There is no dedicated Qwen hosted adapter; `AI_PROVIDER=qwen` is not supported. A weight repository name is not automatically a hosted API ID. No closed model or GPT-OSS fallback is selected.
-
-Open weights matter because inference is replaceable: the optional loopback adapter uses a separately running local model without replacing the user's library or application rules. Hosted Gemma avoids local hardware requirements but transmits selected data and depends on provider limits/pricing. Local inference instead depends on your hardware and runtime; import and media features still use external services.
-
-### What the AI actually does
-
-1. The server reads the saved library and any fresh, already-cached Jikan enrichment. It does not fetch thousands of metadata records or send the complete list to the model.
-2. Hard filters are applied to **Plan to Watch only**, before inference: `≤12`, `≤24`, movie, `≥25`, genre, release status and verified-dub restriction. Numeric length restrictions exclude unknown episode counts; movie format can match even if its episode count is unknown. Completed titles never enter the candidate pool.
-3. Taste analysis uses at most **16 history entries / 6,000 JSON bytes**, balancing higher, middle and lower personal ratings with unrated statuses. Descriptions are limited to 300 characters, genres/tags to 12 each, and titles to 160 characters. Original personal scores, scales, and their normalized value are preserved; unrated is null. Community scores, usernames, notes, timestamps, URLs, and posters are omitted.
-4. A real Gemma call infers recurring positive patterns, tentative dislikes, and uncertainty from history, genres, themes, and descriptions. Every inferred pattern must cite supplied history IDs. An unrated entry is never sent as a zero rating.
-5. A second real call ranks a bounded candidate sample using the validated taste profile, mood, and compact cited-history data. Asking for **one result** caps candidates at **12 titles / 6,000 JSON bytes**; asking for **five results** caps them at **24 titles / 10,000 JSON bytes**. Byte budgets can reduce the actual title count further. Candidate sampling uses stable ID hashing, not a hidden recommendation algorithm or popularity score. Large-list coverage is disclosed explicitly. Narrowing filters changes the eligible sample.
-6. The model returns only candidate selections, explanations, history references, caveats, and qualitative confidence. The backend computes exact shared genre/tag intersections from each selected anime and its cited history, then validates the complete UI response. Model-generated metadata fields are rejected. Shape, candidate/history membership, uniqueness, maximum result count, and common numeric rating, length, percentage and availability assertions in prose are checked; factual titles, scores, episodes and dub claims are rendered from source data. Invalid replies trigger at most one repair request per stage with a specific, sanitized correction, then an error identifying taste analysis or recommendation ranking and the validation category. No rejected prose, values, or unknown fields are echoed. Free-form thematic interpretation can still be mistaken; these checks do not prove all natural-language claims or guarantee the absence of spoilers.
-7. Sparse histories force lower confidence. Confidence is qualitative and never displayed as a measured match percentage. An empty hard-filtered pool makes no inference request.
-
-### AI persistence and failures
-
-SQLite caches validated taste profiles for **seven days** and recommendation results for **24 hours**, with up to 100 records of each kind. Cache keys include the account, model/provider, prompt instructions, sent history, candidate metadata, preferences, and coverage as appropriate. Meaningful changes invalidate the relevant cache; trivial UI changes do not call inference. Reopening the app retains the caches. Expiry is enforced on reads; expired rows are removed during later cache writes.
-
-Identical simultaneous requests share one analysis. Other simultaneous analyses return a busy message. Each operation has a two-minute total deadline; generation calls have a 40-second deadline. Google 5xx responses get one bounded retry; invalid model output gets at most one repair. HTTP 429 uses the longer of the `Retry-After` header and structured Google `RetryInfo.retryDelay`, starts a local cooldown, and reports a sanitized quota category/limit where supplied. Input-token limits, request limits, daily exhaustion and zero available quota have different recovery messages; a short retry delay is not presented as the reset of a daily quota. The quota reason is preserved during the local cooldown. A successful profile survives a failed ranking call. Errors never substitute a hardcoded shortlist, delete the saved library, or expose raw provider responses.
-
-If even one recommendation is rate limited, remember that the result count is not the number of input tokens: the model still compares candidates and analyzes history in separate calls. AniPick does not send a full 500-title library, but large samples and two close-together requests can consume a per-minute token quota. Use the specific error and [AI Studio usage](https://aistudio.google.com/rate-limit) to distinguish this from a daily quota or project access restriction. Quotas are shared by the Google project; creating another key in the same project does not create a new quota. A successful connection check verifies model access, not inference quota headroom.
-
-Cache contents include generated taste descriptions and sample history references and are stored locally alongside the watchlist. The backend enforces consent for cloud requests, including cache reads; local requests do not require Google consent. Google's key goes only in HTTPS headers to its fixed endpoint, and an optional local key goes only to the validated loopback server. Redirects are refused. No key is stored in SQLite, the browser, logs, URLs, or source control.
-
-## Anime previews and community videos
-
-Open an anime from the Library, its featured artwork, a recommendation, or a history citation. **Before you press play** appears inside the existing detail dialog; closing it returns to the current recommendation workflow.
-
-- AniList imports now retain valid YouTube trailer IDs. Existing libraries can retrieve trailers on demand without reimporting. AniList lookup uses the exact anime ID; MAL entries use Jikan's `trailer.youtube_id`. When an AniList trailer is missing or its lookup fails, Jikan is checked when a MAL ID exists. Source failures are distinguished from a confirmed missing trailer.
-- Trailer metadata, including confirmed absence, is cached locally for seven days. Source warnings are shown and partial-failure results are not cached as definitive absence. Metadata cached before trailer support is refreshed lazily. Titles and user scores are never sent to an AI for media discovery.
-- **Load trailer** mounts YouTube's official privacy-enhanced iframe. **Search YouTube for a trailer** stays available during loading, errors, and missing-trailer states. IDs come from the source API; AniPick does not verify that the uploader is an official rights holder, and the UI labels the listing's source accordingly.
-- **Find on TikTok** opens a title-based search for reviews, recommendations, and edits. Paste a full HTTPS `tiktok.com/@creator/video/VIDEO_ID` link under **Save a TikTok video**. Supported hosts are `www.tiktok.com`, `tiktok.com`, and `m.tiktok.com`; links are canonicalized and tracking parameters removed. Open shortened share URLs first and copy the full video URL. Photo posts and unrelated hosts are rejected.
-- Saved TikTok links belong to the anime's stable internal ID and persist across app restarts and list refreshes. Duplicate video IDs are idempotent. **Remove link** deletes only that saved local reference, not the video on TikTok. Association with the anime is user-supplied and unverified.
-- **Load TikTok preview** uses TikTok's official embed player. No third-party player is mounted before a viewer requests it, autoplay is off, and **Hide player** unmounts playback. Players may contact their provider and use provider storage once loaded. Community content carries a spoiler warning; even promotional trailers can reveal story details.
-- Player load failures, TikTok's supported error messages, and slow loads offer recovery. Original-video links remain available. YouTube's opaque iframe reports some playback restrictions inside its own player, so AniPick cannot programmatically diagnose every removed, region-restricted, age-gated, or embedding-disabled video. Login, tracking protection, regional restrictions, and provider availability can still prevent playback.
-
-No YouTube/TikTok API keys, scraping service, OAuth, download, rehosting, external embed script, or runtime dependency is required. SQLite adds `trailers` and `tiktok_videos` tables automatically; existing library snapshots and AI caches remain intact. Production CSP permits frames only from `www.youtube-nocookie.com` and `www.tiktok.com`; scripts remain self-hosted. The video frames alone use an origin-only referrer policy so YouTube receives the required embedder identity; the app's general no-referrer policy remains in place.
-
-### Media smoke check
-
-```powershell
-pnpm test:media
-```
-
-This reads real public AniList metadata in an in-memory verification store, checks a live source trailer and cache reuse, and checks a real AniList-null trailer with the YouTube search fallback. It also attempts Jikan. It never modifies your saved library or calls AI. Successful metadata checks do not establish browser playback.
-
-For a manual demo, open an imported anime, inspect its source attribution, select **Load trailer**, then press play in YouTube. Test a missing trailer's search link. Find an actual relevant TikTok video, save its full URL, reopen the detail dialog to confirm persistence, load its preview, and remove the saved link. Check both desktop and phone layouts and return to Pick for Me to confirm its existing state is preserved.
-
-Official integration references: [AniList Media](https://docs.anilist.co/reference/object/media), [Jikan v4](https://docs.api.jikan.moe/), [YouTube embeds](https://developers.google.com/youtube/player_parameters), [YouTube embedder identity](https://developers.google.com/youtube/terms/required-minimum-functionality#embedded-player-api-client-identity), and [TikTok's embed player](https://developers.tiktok.com/docs/en/embed-player).
-
-## Checks
-
-```powershell
-pnpm test
-pnpm typecheck
-pnpm lint
-pnpm build
-```
-
-The automated suite uses test fixtures and injected HTTP transports to cover pagination, custom-list duplicates, statuses, score scales, filtering, retries, import jobs, SQLite reopening, AI eligibility and payload budgets, forged IDs and traits, JSON validation, sparse history, consent enforcement, caching/invalidation, duplicate-request coalescing, sanitized errors, rate limits, and the full recommendation HTTP boundary through the real Google adapter. These tests do not establish current upstream availability or model quality.
-
-Optional live smoke test (public account, disposable database):
-
-```powershell
-pnpm test:live
-# Or choose public usernames; the second is used only when MAL_CLIENT_ID is set:
-pnpm test:live derF Xinil
-```
-
-It imports every AniList chunk, validates the result and SQLite persistence, checks Jikan enrichment/cache, and imports MAL if configured. Public example accounts can change visibility or username. No example account is added to the app's real database. A skipped MAL check is reported explicitly.
-
-### Final audit — October 18, 2026
-
-The final audit used a real public account in disposable SQLite storage, never the user's saved library. Real cloud inference used the configured **Google AI Studio / `gemma-4-26b-a4b-it`**. Live results establish that these particular requests succeeded; they do not guarantee future availability or subjective recommendation quality.
-
-| Check | Observed result |
-| --- | --- |
-| Automated suite | **110 tests across 15 files passed.** Includes pagination, score scales, boundary filters, private/missing lists, failed-refresh preservation, incomplete details, AI errors/validation/caching, media links, and persistence. |
-| TypeScript, ESLint, production build | Passed. |
-| Real AniList import through HTTP | Public `derF`: **1,216 anime, three pages; 1,052 Completed, 128 Plan to Watch, 1,088 rated.** Every native/normalized personal score and source status matched the live source response. |
-| Real AI taste analysis | A fresh, validated profile from eight rated history entries sampled from 1,088 history entries. Generated by Gemma, not a fixture or cache. |
-| Real Pick for Me, all five lengths | One validated recommendation per filter; every returned ID belonged to the eligible Plan to Watch pool. See counts below. The other four requests reused the taste profile. |
-| Server/database restart | Complete library and all personal scores unchanged. Repeated recommendation returned a valid durable cache hit without new inference. |
-| Real trailer metadata | AniList supplied Cowboy Bebop's `OhNwckCLzis`; cache reuse passed. Cowboy Bebop: Tengoku no Tobira supplied a real AniList-null case; the AniList-only branch and search fallback passed. Playback was not established. |
-| Jikan | Live requests failed with `NETWORK_ERROR`. `test:live` exited **1** for this failure. `test:media` completed AniList checks and explicitly reported Jikan as not verified. |
-| MyAnimeList | Live import **skipped** because `MAL_CLIENT_ID` is not configured. Deterministic pagination, native scores, configuration errors, and destination-validation tests passed. |
-| Production launch | `pnpm start` served page, health, and bundled font with HTTP 200 on isolated loopback port 3005. Media CSP allowlist checked. No Google key pattern found in client JavaScript. Owned process/database removed afterward. |
-| Browser, screenshots, playback | **Not verified:** local browser use remains disabled in Work settings. No rendered desktop/mobile, focus/keyboard, generated-result UI, or actual video playback review is claimed. |
-
-| Length | Eligible Plan to Watch | Sent to model | Validated results |
-| --- | ---: | ---: | ---: |
-| No limit | 128 | 9 | 1 |
-| Up to 12 episodes | 83 | 10 | 1 |
-| Up to 24 episodes | 107 | 9 | 1 |
-| Movie | 16 | 9 | 1 |
-| 25+ episodes | 20 | 9 | 1 |
-
-Private lists, missing users, provider outages, malformed/truncated AI output, forged IDs, access errors, timeouts, and rate limits were exercised with deterministic injected responses. No successful live private-list access is claimed. The first sandboxed test attempt could not connect to localhost test servers (`EACCES`); rerunning with localhost permission passed. Optional React Doctor and CodeRabbit CLIs are unavailable.
-
-### Repeat the HTTP journey audit
-
-Build first. This check creates and removes a separate temporary database, imports public `derF`, compares source scores/statuses, checks every length pool, and restarts the app/database to verify persistence:
-
-```powershell
-pnpm test:audit
-# Opt in to sending this PUBLIC audit sample to Google for real inference:
-pnpm test:audit --infer
-```
-
-`--infer` generates one result per length, checks eligibility and profile reuse, then checks the recommendation cache after restart. It pauses 65 seconds between filters to reduce quota bursts and stops further inference after a failure. Allow several minutes and real provider usage. Diagnostics contain counts/codes, not API keys or generated prose. This script never opens the user's saved watchlist.
-
-## Current limitations and submission work
-
-- **Screenshots and browser review:** capture real Library, recommendation, preview, and phone-width screens. Check keyboard/focus and real YouTube/TikTok playback, including a removed/restricted video and save/reopen/remove of a relevant community link. HTTP and static-markup tests do not replace these checks.
-- **Upstream verification:** add a MAL client ID and verify an actual public MAL list; retry live Jikan when reachable. Imported AniList details and saved browsing remain usable without enrichment.
-- **AI scope:** bounded samples do not cover every backlog title. Sparse ratings reduce personalization, natural-language interpretations can be mistaken, and quota/access limits can still block generation. One suggestion still requires input tokens.
-- **Provider support:** Google/Gemma and optional loopback OpenAI-compatible adapters are implemented. Qwen3.8-27B is not a verified hosted configuration; a compatible local model can be selected only under its real served ID. Hosted inference sends selected data to Google; local computation requires a separately running local model.
-- **Unknown data:** no automated verified-dub or streaming-availability source exists. Do not interpret unknown metadata as confirmed absence. No account writes, payments, authentication, or public hosting setup is included.
-- **Repository/submission:** this checkout has no `.git` directory or root application `LICENSE`. A public repository, owner-chosen project license, project-window provenance, and the submission post still need owner attention. This audit did not initialize Git, commit, publish, or submit anything.
-
-## Demo
-
-1. Start the app and import your real public AniList username (or configure MAL and use that equally visible option).
-2. Watch the page/count progress; on completion the Plan to Watch browser opens.
-3. Search an alternate title, change genre, choose **Up to 12 episodes**, and inspect a card. User and community scores are labeled separately.
-4. Switch to Completed to inspect personal ratings. Return to Plan to Watch.
-5. Reload or restart the app: the saved library remains. Disconnect from the network: saved list browsing still works, while uncached covers/enrichment may be unavailable.
-6. Use **Refresh list** after one minute. An upstream failure displays a retryable error and keeps the previous complete list.
-7. With `GEMINI_API_KEY` configured, select a mood and length in **Pick for Me**, review the cloud disclosure, consent, and generate real suggestions. Inspect history citations and qualitative confidence. Repeat the same preferences to verify a cache hit, then change mood to reuse the taste profile.
-
-## API references
-
-- [AniList GraphQL documentation](https://docs.anilist.co/) and [MediaList scoring fields](https://docs.anilist.co/reference/object/medialist).
-- [MAL official API v2 reference](https://myanimelist.net/apiconfig/references/api/v2).
-- [Jikan v4 reference](https://docs.api.jikan.moe/) and [user-list removal notice](https://jikan.docs.apiary.io/).
-
-## Credits
-
-Built with React, TypeScript, Vite, Tailwind CSS, Express, Node's built-in SQLite, and Zod. Checks use Vitest, TypeScript, and ESLint; dependency versions are pinned by `pnpm-lock.yaml`.
-
-Google DeepMind supplies the open-weight Gemma model; Google AI Studio hosts inference. AniList and MyAnimeList supply watchlist and anime information, with optional Jikan enrichment. YouTube and TikTok provide their official embedded players; their respective service terms, availability, and restrictions apply. Source-listed trailers do not independently establish rights-holder authenticity.
-
-Manrope is by the Manrope Project Authors and ships with its [SIL Open Font License](public/fonts/OFL-Manrope.txt). Posters, synopses, and videos belong to their respective creators and rights holders; AniPick claims no ownership and is not affiliated with or endorsed by the services above. No copyrighted video is downloaded or rehosted.
-
-AniList and MyAnimeList provider marks are bundled as inline SVGs from [Simple Icons](https://github.com/simple-icons/simple-icons), under its [CC0 license](https://github.com/simple-icons/simple-icons/blob/develop/LICENSE.md). Provider trademarks belong to their respective owners. The marks do not require a network request to display.
+Manrope by the Manrope Project Authors is bundled under the [SIL Open Font License](public/fonts/OFL-Manrope.txt).
+Provider SVG marks come from [Simple Icons](https://github.com/simple-icons/simple-icons)
+under [CC0](https://github.com/simple-icons/simple-icons/blob/develop/LICENSE.md).
+Posters, synopses, videos, and trademarks belong to their respective owners. YouTube and
+TikTok provide the embedded players; provider terms apply. Source-listed trailers do
+not prove rights-holder authenticity. AniPick is not affiliated with these services.
