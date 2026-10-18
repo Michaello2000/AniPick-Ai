@@ -1,0 +1,45 @@
+{
+  "name": "anipick",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=24.0.0" },
+  "packageManager": "pnpm@11.25.0",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:live": "node --env-file-if-exists=.env --import tsx scripts/live-check.ts",
+    "test:ai": "node --env-file-if-exists=.env --import tsx scripts/ai-check.ts",
+    "test:media": "node --import tsx scripts/media-check.ts",
+    "test:audit": "node --env-file-if-exists=.env --import tsx scripts/audit-check.ts",
+    "build": "vite build && tsc -p tsconfig.server.json",
+    "start": "node --env-file-if-exists=.env dist/server/index.js"
+  },
+  "dependencies": {
+    "express": "^5.3.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/express": "^5.0.6",
+    "@types/node": "^24.10.0",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.0",
+    "eslint": "^10.13.0",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.5.0",
+    "globals": "^17.0.0",
+    "tailwindcss": "^4.3.3",
+    "tsx": "^4.23.15",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.48.0",
+    "vite": "^8.3.4",
+    "vitest": "^5.0.5"
+  }
+}
