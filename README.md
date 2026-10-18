@@ -10,11 +10,11 @@ The visual system is documented in [DESIGN.md](DESIGN.md), with product constrai
 
 ## Screenshots
 
-Actual Cloud/Local settings, captured from the production app in Brave. No inference server was running, so these show loading/recovery rather than fabricated model results.
+Actual production interface with blue accents, local AniList/MAL logos, and in-app MAL setup. The credential field is empty; no fabricated successful MAL import is shown.
 
-![AniPick local AI settings on desktop](docs/screenshots/local-settings-desktop.jpg)
+![AniPick blue import page and MAL setup](docs/screenshots/blue-import-mal-setup.jpg)
 
-[Phone-width settings screenshot](docs/screenshots/local-settings-mobile.jpg). Settings were reviewed at 1440px and 390px, including keyboard mode selection, consent reset, unavailable-server recovery, and horizontal overflow. Full successful-result and video-playback review remains outstanding.
+[Phone-width MAL setup screenshot](docs/screenshots/blue-mal-setup-mobile.jpg). The current import screen was reviewed at 1280px and 390px without horizontal overflow. Cloud/Local settings were also previously checked for keyboard selection, consent reset, and unavailable-server recovery. Full successful-result and video-playback review remains outstanding.
 
 ## Run locally
 
@@ -63,6 +63,8 @@ To enable MAL:
 3. Restart AniPick. Select **MyAnimeList** and import a public username.
 
 The app sends `X-MAL-CLIENT-ID` from the server. **Viewers do not need OAuth or a login.** A client secret or access token is not used. Never put credentials into `VITE_*` variables, URLs, browser code, or source control. `.env` is ignored. Without a client ID, MAL displays an explicit setup error; AniList and saved libraries still work.
+
+On a freshly cloned copy, `.env.example` contains empty credentials on purpose. Your Google AI Studio key enables cloud recommendations; it cannot authenticate MAL imports. **You can now configure MAL on the import page:** select MyAnimeList, follow the registration link, paste your application's **Client ID**, and choose **Save and enable MAL**. AniPick validates it with the official API before saving it in the local, ignored SQLite database; imports become available immediately without a restart. Invalid credentials are not saved, and the stored ID is never returned to the browser. A saved ID takes precedence over `MAL_CLIENT_ID` in `.env`; the environment-variable setup remains supported. AniList imports need neither credential. If the UI reports an unreadable API response, launch `pnpm dev` (both frontend and backend), rather than Vite alone.
 
 MAL retrieves all statuses with 500-entry offset pagination and follows only validated offsets under the original official API path. Rich metadata is requested alongside list entries, avoiding thousands of Jikan calls during import. IDs, never title similarity, link Jikan enrichment to MAL entries.
 
@@ -169,6 +171,8 @@ AI_MODEL=gemma-4-26b-a4b-it
 ```
 
 Completed lists and metadata survive process restarts. Active import jobs are held in memory: if the server restarts, retry the import; the last saved snapshot remains. Imports run one at a time. Large lists can take minutes. A 200-chunk/page safety ceiling fails explicitly rather than saving a truncated list. Lists are not automatically refreshed; use **Refresh list**. After seven days, Jikan metadata is refreshed on demand.
+
+To remove an imported library, open **Manage libraries**, choose **Remove** beside its saved account, and confirm. This deletes that local library snapshot, never the external AniList/MAL list. Other saved libraries remain; removing the active one opens another, or returns to the import screen when none remain. All derived AI caches are cleared because existing hashed cache entries have no per-account index. Shared anime metadata and saved video links remain. Removal waits until current imports/AI analyses finish so an in-flight operation cannot restore deleted data. Refresh/restart does not bring the removed list back unless you import it again.
 
 There is no analytics. Import requests go to the chosen anime provider; details with a known MAL ID may call Jikan. Cover art loads from third-party image hosts. Only an explicit Pick for Me request with cloud consent sends a bounded watchlist sample to Google. External synopses and model prose are rendered as text. The local API checks Host and Origin and the production app uses a restrictive content security policy.
 
@@ -373,3 +377,5 @@ Built with React, TypeScript, Vite, Tailwind CSS, Express, Node's built-in SQLit
 Google DeepMind supplies the open-weight Gemma model; Google AI Studio hosts inference. AniList and MyAnimeList supply watchlist and anime information, with optional Jikan enrichment. YouTube and TikTok provide their official embedded players; their respective service terms, availability, and restrictions apply. Source-listed trailers do not independently establish rights-holder authenticity.
 
 Manrope is by the Manrope Project Authors and ships with its [SIL Open Font License](public/fonts/OFL-Manrope.txt). Posters, synopses, and videos belong to their respective creators and rights holders; AniPick claims no ownership and is not affiliated with or endorsed by the services above. No copyrighted video is downloaded or rehosted.
+
+AniList and MyAnimeList provider marks are bundled as inline SVGs from [Simple Icons](https://github.com/simple-icons/simple-icons), under its [CC0 license](https://github.com/simple-icons/simple-icons/blob/develop/LICENSE.md). Provider trademarks belong to their respective owners. The marks do not require a network request to display.

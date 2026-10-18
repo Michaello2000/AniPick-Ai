@@ -15,6 +15,7 @@ export class LibraryStore {
     this.db = new DatabaseSync(path);
     this.db.exec(`PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;
       CREATE TABLE IF NOT EXISTS libraries (id TEXT PRIMARY KEY, imported_at TEXT NOT NULL, payload TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS settings (name TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS metadata (mal_id INTEGER PRIMARY KEY, payload TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS ai_cache (cache_key TEXT PRIMARY KEY, kind TEXT NOT NULL, created_at TEXT NOT NULL, expires_at TEXT NOT NULL, payload TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS trailers (anime_id TEXT PRIMARY KEY, payload TEXT NOT NULL);
@@ -27,9 +28,27 @@ export class LibraryStore {
       .run(library.id, library.importedAt, JSON.stringify(library));
     return library;
   }
+  getMalClientId(): string | null {
+    const row = this.db.prepare('SELECT value FROM settings WHERE name = ?').get('mal_client_id');
+    return row ? z.object({ value: z.string() }).parse(row).value : null;
+  }
+  saveMalClientId(clientId: string): void {
+    this.db.prepare('INSERT INTO settings (name, value) VALUES (?, ?) ON CONFLICT(name) DO UPDATE SET value=excluded.value').run('mal_client_id', clientId);
+  }
   get(id: string): Library | null {
     const row = this.db.prepare('SELECT payload FROM libraries WHERE id = ?').get(id);
     return row ? librarySchema.parse(JSON.parse(rowSchema.parse(row).payload)) : null;
+  }
+  remove(id: string): boolean {
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      const removed = this.db.prepare('DELETE FROM libraries WHERE id = ?').run(id).changes > 0;
+      // Existing cache keys are hashes without an account index. Clear derived AI
+      // caches so a removed library's taste analysis cannot remain cached.
+      if (removed) this.db.exec('DELETE FROM ai_cache');
+      this.db.exec('COMMIT');
+      return removed;
+    } catch (error) { this.db.exec('ROLLBACK'); throw error; }
   }
   list(): LibrarySummary[] {
     return this.db.prepare('SELECT payload FROM libraries ORDER BY imported_at DESC, id').all().map(row => {

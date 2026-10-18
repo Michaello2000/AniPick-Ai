@@ -20,4 +20,4 @@ Anime viewers with an AniList or MyAnimeList backlog who want to decide what to 
 
 ## Brand commitments
 
-Premium personal library; prominent real anime artwork; distinctive restrained dark UI; one primary accent. Letterboxd, Linear, and modern streaming interfaces are the user's references. Pick for Me is the primary interaction, with a clear separate library destination. No generic SaaS dashboard, giant statistic cards, purple gradients, unnecessary motion, or fake content.
+Premium personal library; prominent real anime artwork; distinctive restrained dark UI; one blue primary accent. Letterboxd, Linear, and modern streaming interfaces are the user's references. Pick for Me is the primary interaction, with a clear separate library destination. No generic SaaS dashboard, giant statistic cards, purple gradients, unnecessary motion, or fake content.

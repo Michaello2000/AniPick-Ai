@@ -23,6 +23,7 @@ export class RecommendationService {
   private readonly pending = new Map<string, Promise<RecommendationResponse>>();
   private rateLimit: { until: number; error: AiRateLimitError } | null = null;
   constructor(private readonly store: LibraryStore, readonly configuration: AiConfiguration) {}
+  isBusy(): boolean { return this.pending.size > 0; }
 
   private library(id: string): Library {
     const library = this.store.get(id);

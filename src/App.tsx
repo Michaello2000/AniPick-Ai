@@ -8,6 +8,8 @@ import { Icon } from './icons.js';
 import { PickForMe } from './PickForMe.js';
 import { lengths } from './length-options.js';
 import { LibraryHero } from './LibraryHero.js';
+import { ProviderLogo } from './ProviderLogo.js';
+import { MalSetup } from './MalSetup.js';
 
 interface ImportRequest { provider: Provider; username: string; refresh: boolean }
 
@@ -22,6 +24,7 @@ export function App() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [switching, setSwitching] = useState(false);
+  const [removingId, setRemovingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [job, setJob] = useState<ImportProgress | null>(null);
   const [lastRequest, setLastRequest] = useState<ImportRequest | null>(null);
@@ -30,7 +33,7 @@ export function App() {
   const [selected, setSelected] = useState<Anime | null>(null);
   const [bootAttempt, setBootAttempt] = useState(0);
   const activeJobId = job?.state === 'running' ? job.id : null;
-  const busy = submitting || Boolean(activeJobId);
+  const busy = submitting || Boolean(activeJobId) || Boolean(removingId);
 
   useEffect(() => {
     function navigate() {
@@ -108,6 +111,27 @@ export function App() {
     catch (failure) { setError(errorMessage(failure)); }
     finally { setSwitching(false); }
   }
+  async function removeLibrary(saved: LibrarySummary) {
+    if (busy || switching || loading) return;
+    if (!window.confirm(`Remove ${saved.username}’s ${providerLabels[saved.provider]} list from this computer? Your external account is unchanged. All cached AI analyses will also be cleared; other saved lists stay available.`)) return;
+    setRemovingId(saved.id); setError(null);
+    try {
+      await api.removeLibrary(saved.id);
+      setLibraries(current => current.filter(item => item.id !== saved.id));
+      setLastRequest(null);
+      if (job?.libraryId === saved.id) setJob(null);
+      const wasActive = library?.id === saved.id;
+      if (wasActive) { setLibrary(null); setSelected(null); setVisibleCount(60); setFilters({ status: 'planning', length: 'all', sort: 'title' }); }
+      const remaining = await api.libraries();
+      setLibraries(remaining.libraries);
+      if (wasActive) {
+        const next = remaining.libraries[0];
+        if (next) setLibrary(await api.library(next.id));
+        else setView('library');
+      }
+    } catch (failure) { setError(errorMessage(failure)); }
+    finally { setRemovingId(null); }
+  }
   function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); void runImport({ provider, username, refresh: false }); }
   function updateFilters(update: Partial<BrowseFilters>) { setFilters(current => ({ ...current, ...update })); setVisibleCount(60); }
   function resetFilters() { setFilters({ status: filters.status, length: 'all', sort: 'title', search: '', genre: '' }); setVisibleCount(60); }
@@ -139,22 +163,22 @@ export function App() {
           <form onSubmit={submit}>
             <fieldset className="provider-picker" disabled={busy || loading}>
               <legend className="sr-only">Watchlist provider</legend>
-              <label className={provider === 'anilist' ? 'chosen' : ''}><input type="radio" name="provider" value="anilist" checked={provider === 'anilist'} onChange={() => setProvider('anilist')} /><span className="provider-letter" aria-hidden="true">A</span>AniList</label>
-              <label className={provider === 'mal' ? 'chosen' : ''}><input type="radio" name="provider" value="mal" checked={provider === 'mal'} onChange={() => setProvider('mal')} /><span className="provider-letter mal-letter" aria-hidden="true">M</span>MyAnimeList</label>
+              <label className={provider === 'anilist' ? 'chosen' : ''}><input type="radio" name="provider" value="anilist" checked={provider === 'anilist'} onChange={() => setProvider('anilist')} /><ProviderLogo provider="anilist" />AniList</label>
+              <label className={provider === 'mal' ? 'chosen' : ''}><input type="radio" name="provider" value="mal" checked={provider === 'mal'} onChange={() => setProvider('mal')} /><ProviderLogo provider="mal" />MyAnimeList</label>
             </fieldset>
             <label className="field-label" htmlFor="username">{providerLabels[provider]} username</label>
             <input id="username" name="username" type="text" placeholder="Your public username" autoComplete="off" autoCapitalize="none" spellCheck={false} maxLength={32} pattern="[A-Za-z0-9_-]{1,32}" title="Letters, numbers, hyphens and underscores" required value={username} onChange={event => setUsername(event.target.value)} disabled={busy || loading} />
-            <button className="primary-button" type="submit" disabled={busy || loading || !username.trim()}>{busy ? <><span className="spinner" />Importing your list…</> : <>Import list <Icon name="arrow" size={18} /></>}</button>
+            <button className="primary-button" type="submit" disabled={busy || loading || !username.trim() || (provider === 'mal' && malConfigured !== true)}>{busy ? <><span className="spinner" />Importing your list…</> : <>Import list <Icon name="arrow" size={18} /></>}</button>
           </form>
           <p className="import-note"><Icon name="globe" size={14} />Public lists only. No viewer login required.</p>
-          {provider === 'mal' && <p className={`provider-note ${malConfigured === false ? 'setup-note' : ''}`}>{malConfigured === false ? <>MAL setup needed: add <code>MAL_CLIENT_ID</code> to the server’s <code>.env</code>, then restart. Hosted Jikan no longer provides user lists.</> : 'Public list from the official MAL API. Extra anime metadata from Jikan.'}</p>}
+          {provider === 'mal' && (malConfigured === false ? <MalSetup disabled={busy || loading} onConfigured={() => setMalConfigured(true)} /> : <p className="provider-note">Public list from the official MAL API. Extra anime metadata from Jikan.</p>)}
           {job && <div className={`import-status ${job.state}`} role="status" aria-live="polite">{job.state === 'complete' && <Icon name="check" size={16} />}<div><p>{job.message}</p>{job.state === 'running' && <span>{job.imported.toLocaleString()} anime · {job.pages} pages read. Large lists can take a few minutes.</span>}</div></div>}
         </section>
 
         <div className="manager-libraries">{libraries.length > 0 && <section className="saved-libraries"><h3>Saved libraries <span>{libraries.length}</span></h3>
-          <div className="library-list">{libraries.map(saved => <button key={saved.id} className={`library-item ${library?.id === saved.id ? 'selected' : ''}`} onClick={() => { void openLibrary(saved.id); }} disabled={switching} aria-pressed={library?.id === saved.id}>
+          <div className="library-list">{libraries.map(saved => <div className="library-row" key={saved.id}><button className={`library-item ${library?.id === saved.id ? 'selected' : ''}`} onClick={() => { void openLibrary(saved.id); }} disabled={switching || Boolean(removingId)} aria-pressed={library?.id === saved.id}>
             <span className="library-avatar">{saved.username.slice(0, 1).toUpperCase()}</span><span><strong>{saved.username}</strong><small>{providerLabels[saved.provider]} · {saved.count.toLocaleString()} anime</small></span>{library?.id === saved.id && <span className="selected-dot" aria-hidden="true" />}
-          </button>)}</div>
+          </button><button className="text-button remove-library" type="button" disabled={busy || switching || loading} aria-label={`Remove ${providerLabels[saved.provider]} list for ${saved.username}`} onClick={() => { void removeLibrary(saved); }}>{removingId === saved.id ? 'Removing…' : 'Remove'}</button></div>)}</div>
         </section>}
         <div className="privacy-note"><Icon name="lock" size={17} /><div><h3>A collection that stays yours.</h3><p>Your library is saved on this computer. Browse anytime without an AI key.</p><p className="quiet">Imports contact your list provider. Posters load from their image hosts.</p></div></div>
         </div></div>

@@ -14,9 +14,10 @@ afterEach(async () => {
   }
 });
 
-async function setup(responses: unknown[] = []) {
+async function setup(responses: unknown[] = [], beforeResponse?: () => Promise<void>) {
   const store = new LibraryStore(':memory:');
   const client = new UpstreamClient(async () => {
+    await beforeResponse?.();
     const response = responses.shift();
     if (response === undefined) throw new Error('Unexpected upstream request');
     return response instanceof Response ? response : Response.json(response);
@@ -30,6 +31,46 @@ async function setup(responses: unknown[] = []) {
 }
 
 describe('localhost API', () => {
+  it('refuses removal while an import could still save data', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const { base, store } = await setup([
+      { data: { User: { id: 1, name: 'Viewer', mediaListOptions: { scoreFormat: 'POINT_10' } } } },
+      { data: { MediaListCollection: { hasNextChunk: false, user: { id: 1, name: 'Viewer', mediaListOptions: { scoreFormat: 'POINT_10' } }, lists: [{ entries: [anilistEntry(1)] }] } } },
+    ], () => gate);
+    const saved = store.save('anilist', 'Saved', [entry(1)]);
+    const started = await fetch(`${base}/api/imports`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ provider: 'anilist', username: 'Viewer' }) });
+    const job: { id: string } = await started.json();
+    try {
+      const response = await fetch(`${base}/api/libraries/${encodeURIComponent(saved.id)}`, { method: 'DELETE' });
+      expect(response.status).toBe(409);
+      expect((await response.json()).error.code).toBe('LIBRARY_BUSY');
+      expect(store.get(saved.id)).toEqual(saved);
+    } finally {
+      release();
+      let state = 'running';
+      for (let i = 0; i < 50 && state === 'running'; i++) {
+        state = (await (await fetch(`${base}/api/imports/${job.id}`)).json()).state;
+        if (state === 'running') await new Promise(resolve => setTimeout(resolve, 10));
+      }
+      expect(state).toBe('complete');
+    }
+  });
+  it('removes only the selected local library and rejects cross-origin removal', async () => {
+    const { base, store } = await setup();
+    const first = store.save('anilist', 'First', [entry(1)]);
+    const second = store.save('mal', 'Second', [{ ...entry(2), provider: 'mal' }]);
+    const route = `${base}/api/libraries/${encodeURIComponent(first.id)}`;
+    expect((await fetch(route, { method: 'DELETE', headers: { Origin: 'https://external.invalid' } })).status).toBe(403);
+    expect(store.get(first.id)).toEqual(first);
+    const removed = await fetch(route, { method: 'DELETE' });
+    expect(removed.status).toBe(200);
+    expect(await removed.json()).toEqual({ removed: true });
+    expect((await fetch(route)).status).toBe(404);
+    expect((await fetch(route, { method: 'DELETE' })).status).toBe(404);
+    expect(store.get(second.id)).toEqual(second);
+    expect((await (await fetch(`${base}/api/libraries`)).json()).libraries.map((library: { id: string }) => library.id)).toEqual([second.id]);
+  });
   it('supports local community links and a real-source no-trailer response with strict URL validation', async () => {
     const { base, store } = await setup([{ data: { Media: { id: 1, trailer: null } } }]);
     store.save('anilist', 'Viewer', [entry()]);

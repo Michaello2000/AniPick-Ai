@@ -6,7 +6,12 @@ import { savedTikTokSchema, trailerResponseSchema } from '../shared/media.js';
 const errorSchema = z.object({ error: z.object({ code: z.string(), message: z.string() }) });
 async function request<T>(path: string, schema: z.ZodType<T>, init?: RequestInit): Promise<T> {
   const response = await fetch(`/api${path}`, { ...init, signal: init?.signal ?? AbortSignal.timeout(15000) });
-  const body: unknown = await response.json();
+  let body: unknown;
+  try { body = await response.json(); }
+  catch (error) {
+    if (!(error instanceof SyntaxError)) throw error;
+    throw new Error('AniPick’s API returned an unreadable response. Run the full app with pnpm dev (Node.js 24+), or pnpm build followed by pnpm start. Starting Vite alone does not start the import server.', { cause: error });
+  }
   if (!response.ok) {
     const parsed = errorSchema.safeParse(body);
     throw new Error(parsed.success ? parsed.data.error.message : `AniPick returned an error (${response.status}). Retry the operation.`);
@@ -16,8 +21,10 @@ async function request<T>(path: string, schema: z.ZodType<T>, init?: RequestInit
 
 export const api = {
   capabilities: (signal?: AbortSignal) => request('/health', capabilitiesSchema, { signal }),
+  configureMal: (clientId: string) => request('/settings/mal', capabilitiesSchema, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientId }), signal: AbortSignal.timeout(90000) }),
   libraries: (signal?: AbortSignal) => request('/libraries', z.object({ libraries: z.array(librarySummarySchema) }), { signal }),
   library: (id: string, signal?: AbortSignal) => request(`/libraries/${encodeURIComponent(id)}`, librarySchema, { signal }),
+  removeLibrary: (id: string) => request(`/libraries/${encodeURIComponent(id)}`, z.object({ removed: z.literal(true) }), { method: 'DELETE' }),
   activeImport: (signal?: AbortSignal) => request('/imports', z.object({ job: progressSchema.nullable() }), { signal }),
   import: (provider: Provider, username: string, refresh = false) => request('/imports', progressSchema, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ provider, username, refresh }) }),
   progress: (id: string, signal?: AbortSignal) => request(`/imports/${encodeURIComponent(id)}`, progressSchema, { signal }),

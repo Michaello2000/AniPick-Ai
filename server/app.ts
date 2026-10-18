@@ -23,6 +23,8 @@ export function createApp({ store, client, malClientId, dev = false, ai = config
   const jobs = new Map<string, ImportProgress>();
   let activeJob: string | null = null;
   const metadata = new MetadataService(store, client);
+  const recommendations = new RecommendationService(store, ai);
+  const currentMalClientId = () => store.getMalClientId() || malClientId;
   app.disable('x-powered-by');
   app.use((req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -46,7 +48,18 @@ export function createApp({ store, client, malClientId, dev = false, ai = config
   });
   app.use('/api', (_req, res, next) => { res.setHeader('Cache-Control', 'no-store'); next(); });
   app.use(express.json({ limit: '2kb' }));
-  app.get('/api/health', (_req, res) => res.json({ ok: true, malConfigured: Boolean(malClientId) }));
+  app.get('/api/health', (_req, res) => res.json({ ok: true, malConfigured: Boolean(currentMalClientId()) }));
+  app.post('/api/settings/mal', async (req, res) => {
+    if (activeJob) throw new ApiError('IMPORT_BUSY', 'Wait for the current import to finish before updating MAL setup.', 409);
+    const input = z.strictObject({ clientId: z.string().trim().regex(/^[A-Za-z0-9_-]{8,256}$/) }).safeParse(req.body);
+    if (!input.success) throw new ApiError('MAL_CLIENT_ID_INVALID', 'Paste the Client ID from your MAL application, not a URL, client secret, or Google AI Studio key.', 400);
+    const { clientId } = input.data;
+    if (/^AIza/.test(clientId)) throw new ApiError('WRONG_PROVIDER_KEY', 'That looks like a Google AI Studio key. MAL needs the Client ID from your MyAnimeList application.', 400);
+    const verified = z.object({ id: z.literal(1) }).safeParse(await client.json('https://api.myanimelist.net/v2/anime/1?fields=id', { headers: { 'X-MAL-CLIENT-ID': clientId, Accept: 'application/json' } }, 1100));
+    if (!verified.success) throw new ApiError('MAL_SETUP_FAILED', 'MAL did not confirm access. Check the Client ID and retry.', 502);
+    store.saveMalClientId(clientId);
+    res.json({ malConfigured: true });
+  });
   app.get('/api/libraries', (_req, res) => res.json({ libraries: store.list() }));
   app.get('/api/imports', (_req, res) => res.json({ job: activeJob ? jobs.get(activeJob) : null }));
   app.get('/api/libraries/:id', (req, res) => {
@@ -54,9 +67,16 @@ export function createApp({ store, client, malClientId, dev = false, ai = config
     if (!library) throw new ApiError('LIBRARY_NOT_FOUND', 'This saved library was not found. Import the username again.', 404);
     res.json(library);
   });
+  app.delete('/api/libraries/:id', (req, res) => {
+    if (activeJob || recommendations.isBusy()) throw new ApiError('LIBRARY_BUSY', 'Wait for the current import or AI analysis to finish before removing a saved list.', 409);
+    if (!store.remove(req.params.id)) throw new ApiError('LIBRARY_NOT_FOUND', 'This saved list was already removed or does not exist.', 404);
+    for (const [id, job] of jobs) if (job.libraryId === req.params.id) jobs.delete(id);
+    res.json({ removed: true });
+  });
   app.post('/api/imports', (req, res) => {
     const input = importSchema.parse(req.body);
-    if (input.provider === 'mal' && !malClientId) throw new ApiError('MAL_NOT_CONFIGURED', 'Add MAL_CLIENT_ID to the server .env and restart. MyAnimeList requires an application client ID; viewers do not need to log in.', 503);
+    const importClientId = currentMalClientId();
+    if (input.provider === 'mal' && !importClientId) throw new ApiError('MAL_NOT_CONFIGURED', 'Enable MyAnimeList in the import panel with your MAL application Client ID, or add MAL_CLIENT_ID to .env and restart. Your Google key is only for AI recommendations.', 503);
     const id = libraryId(input.provider, input.username);
     const cached = store.get(id);
     if (activeJob) throw new ApiError('IMPORT_BUSY', 'An import is already running. Wait for it to finish, then retry.', 409);
@@ -72,7 +92,7 @@ export function createApp({ store, client, malClientId, dev = false, ai = config
     const progress = (pages: number, imported: number, message: string) => { Object.assign(job, { pages, imported, message }); };
     const run = async () => {
       try {
-        const result = input.provider === 'anilist' ? await importAniList(input.username, client, progress) : await importMal(input.username, malClientId, client, progress);
+        const result = input.provider === 'anilist' ? await importAniList(input.username, client, progress) : await importMal(input.username, importClientId, client, progress);
         const saved = store.save(input.provider, result.username, result.entries);
         Object.assign(job, { state: 'complete', libraryId: saved.id, imported: saved.entries.length, message: `Saved ${saved.entries.length} anime locally.` });
       } catch (error) {
@@ -93,7 +113,7 @@ export function createApp({ store, client, malClientId, dev = false, ai = config
     if (!store.hasMalId(id)) throw new ApiError('ANIME_NOT_IMPORTED', 'Import this anime in a watchlist before fetching extra metadata.', 404);
     res.json(await metadata.get(id));
   });
-  registerRecommendationRoutes(app, new RecommendationService(store, ai));
+  registerRecommendationRoutes(app, recommendations);
   registerMediaRoutes(app, store, new TrailerService(store, client, metadata));
   app.use('/api', (_req, res) => res.status(404).json({ error: { code: 'NOT_FOUND', message: 'This API route does not exist.' } }));
   const clientPath = resolve('dist/client');

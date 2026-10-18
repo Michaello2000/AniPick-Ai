@@ -4,7 +4,7 @@
 
 AniPick is a personal anime collection, viewed like a private cinema programme. Real poster art supplies the visual variety; the interface supplies calm, precise structure. The references are Letterboxd's cover-first browsing, Linear's careful typography and controls, and streaming services' clear distinction between browsing and choosing. This is a working library, not a marketing page or an analytics dashboard.
 
-Use neutral charcoal, warm white, and one vermilion accent. Avoid purple gradients, decorative glass, nested cards, large statistic tiles, and scroll choreography. GPT Taste informs composition and typographic confidence; Impeccable's task-first principles and the user's restraint take priority over that skill's marketing layouts and mandatory GSAP effects.
+Use neutral charcoal, warm white, and one clear blue accent. Avoid purple gradients, decorative glass, nested cards, large statistic tiles, and scroll choreography. GPT Taste informs composition and typographic confidence; Impeccable's task-first principles and the user's restraint take priority over that skill's marketing layouts and mandatory GSAP effects.
 
 ## Existing UX audit
 
@@ -37,8 +37,8 @@ The implementation in `src/styles.css` is the source of truth.
 | Secondary text | `#b3b4ba` |
 | Quiet text | `#9799a1` |
 | Divider | `#303238` |
-| Primary action | `#f2876b`, dark text `#20140f` |
-| Focus | `#f7ac95` |
+| Primary action | `#70b5ff`, dark text `#0b1a2c` |
+| Focus | `#add4ff` |
 | Error | `#f0b2a1` on `#2c201e` |
 | Success | `#b7d7b4` on `#1d281f` |
 
