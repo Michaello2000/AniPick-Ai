@@ -12,7 +12,7 @@ The visual system is documented in [DESIGN.md](DESIGN.md), with product constrai
 
 Actual production interface with blue accents, local AniList/MAL logos, and in-app MAL setup. The credential field is empty; no fabricated successful MAL import is shown.
 
-![AniPick blue import page and MAL setup](docs/screenshots/blue-import-mal-setup.jpg)
+![AniPick blue import page and MAL setup](docs/screenshots/anipick.jpg)
 
 [Phone-width MAL setup screenshot](docs/screenshots/blue-mal-setup-mobile.jpg). The current import screen was reviewed at 1280px and 390px without horizontal overflow. Cloud/Local settings were also previously checked for keyboard selection, consent reset, and unavailable-server recovery. Full successful-result and video-playback review remains outstanding.
 
